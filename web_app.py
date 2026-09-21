@@ -62,6 +62,7 @@ def load_text(filename: str) -> str:
 SYSTEM_PROMPT = load_text("system_prompt.md")
 KB_GESTACION = load_text("kb_gestacion.md")
 KB_LACTANTE = load_text("kb_lactante.md")
+KB_INFANTE_MAYOR = load_text("kb_infante_mayor.md")
 
 FULL_SYSTEM_PROMPT = f"""{SYSTEM_PROMPT}
 
@@ -73,9 +74,15 @@ FULL_SYSTEM_PROMPT = f"""{SYSTEM_PROMPT}
 
 ---
 
-# BASE DE CONOCIMIENTO — LACTANTE MENOR
+# BASE DE CONOCIMIENTO — LACTANTE MENOR (0-6 MESES)
 
 {KB_LACTANTE}
+
+---
+
+# BASE DE CONOCIMIENTO — INFANTE MAYOR (6-24 MESES)
+
+{KB_INFANTE_MAYOR}
 
 ---
 
@@ -140,5 +147,6 @@ def chat():
 
 
 if __name__ == "__main__":
-    logger.info("Servidor web iniciado en http://localhost:5000")
-    app.run(host="0.0.0.0", port=5000, debug=False)
+    port = int(os.environ.get("PORT", 5000))
+    logger.info("Servidor web iniciado en el puerto %s", port)
+    app.run(host="0.0.0.0", port=port, debug=False)
