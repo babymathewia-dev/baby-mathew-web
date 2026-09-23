@@ -2,6 +2,78 @@
 <html lang="es">
 <head>
 <meta charset="utf-8">
+  <!-- =====================================================================
+  BABY MATHEW IA — ANALÍTICA MÍNIMA VIABLE (GA4)
+  Dónde pegarlo: dentro del <head> del index.html de babymathewia.com,
+  lo más arriba posible. ID de medición: G-8M6P16771E (verificar contra GA4).
+  No envía el texto de las preguntas ni de las respuestas: solo conteos,
+  tiempos y banderas (dato de salud = sensible, Ley 1581/2012 art. 5).
+===================================================================== -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-8M6P16771E"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+  gtag('config', 'G-8M6P16771E', { anonymize_ip: true });
+
+  (function () {
+    var enviadoEn = null;      // momento en que se envió la última pregunta
+    var nPregunta = 0;         // número de pregunta dentro de la conversación
+
+    function tramoLargo(n) {
+      return n < 50 ? 'corta' : n < 200 ? 'media' : 'larga';
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      var form   = document.getElementById('composer');
+      var input  = document.getElementById('input');
+      var file   = document.getElementById('fileInput');
+      var nueva  = document.getElementById('newChatBtn');
+      var adjBtn = document.getElementById('attachBtn');
+
+      // 1) Pregunta enviada
+      if (form) form.addEventListener('submit', function () {
+        var txt = (input && input.value || '').trim();
+        if (!txt && !(file && file.files && file.files.length)) return;
+        nPregunta++;
+        enviadoEn = performance.now();
+        gtag('event', 'mensaje_enviado', {
+          numero_pregunta: nPregunta,
+          longitud: tramoLargo(txt.length),
+          con_adjunto: (file && file.files && file.files.length) ? 'si' : 'no'
+        });
+        if (nPregunta === 1) gtag('event', 'conversacion_iniciada');
+      }, true);
+
+      // 2) Respuesta del bot / error (detecta nodos .msg que agrega la página)
+      var main = document.getElementById('main') || document.body;
+      new MutationObserver(function (muts) {
+        muts.forEach(function (m) {
+          m.addedNodes.forEach(function (n) {
+            if (!n.classList || !n.classList.contains('msg')) return;
+            if (n.classList.contains('user')) return;
+            var ms = enviadoEn ? Math.round(performance.now() - enviadoEn) : null;
+            if (n.classList.contains('error')) {
+              gtag('event', 'respuesta_error', { latencia_ms: ms });
+            } else {
+              gtag('event', 'respuesta_recibida', { latencia_ms: ms, numero_pregunta: nPregunta });
+            }
+            enviadoEn = null;
+          });
+        });
+      }).observe(main, { childList: true, subtree: true });
+
+      // 3) Nueva conversación y uso del adjunto
+      if (nueva) nueva.addEventListener('click', function () {
+        gtag('event', 'nueva_conversacion', { preguntas_previas: nPregunta });
+        nPregunta = 0;
+      });
+      if (adjBtn) adjBtn.addEventListener('click', function () {
+        gtag('event', 'adjunto_click');
+      });
+    });
+  })();
+</script>
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Baby Mathew</title>
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
