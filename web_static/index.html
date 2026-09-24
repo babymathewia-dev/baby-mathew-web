@@ -1,0 +1,402 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Baby Mathew</title>
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
+<meta name="apple-mobile-web-app-title" content="Baby Mathew">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#3E8E8A">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Baloo+2:wght@600;700&family=Source+Sans+3:wght@400;600;700&display=swap">
+<style>
+  :root{
+    --bg:#F3FAF9; --surface:#FFFFFF; --surface-alt:#EAF6F4; --border:#D8ECE9;
+    --text:#173330; --text-muted:#5C7A76; --primary:#3E8E8A; --primary-dark:#2B6A67;
+    --danger-bg:#FDEDEC; --danger-border:#F3B9B2; --danger-text:#8A2E22;
+    --bubble-user:#3E8E8A; --bubble-user-text:#FFFFFF; --bubble-bot:#FFFFFF; --bubble-bot-text:#173330;
+    --shadow: 0 1px 2px rgba(20,50,47,0.06), 0 4px 14px rgba(20,50,47,0.06);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --bg:#0E1716; --surface:#16201F; --surface-alt:#1B2725; --border:#243634;
+      --text:#E7F3F1; --text-muted:#93ACA8; --primary:#5FBDB8; --primary-dark:#7ED0CB;
+      --danger-bg:#2B1A18; --danger-border:#5A2F29; --danger-text:#F3A99B;
+      --bubble-user:#2B6A67; --bubble-user-text:#F2FBFA; --bubble-bot:#1B2725; --bubble-bot-text:#E7F3F1;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 4px 14px rgba(0,0,0,0.35);
+    }
+  }
+  *{box-sizing:border-box;}
+  html,body{height:100%;margin:0;}
+  body{
+    background:var(--bg); color:var(--text);
+    font-family:"Source Sans 3", ui-sans-serif, system-ui, sans-serif;
+    display:flex; flex-direction:column; height:100%; overflow:hidden;
+  }
+  h1,h2{font-family:"Baloo 2","Source Sans 3",sans-serif;}
+  header{
+    flex:0 0 auto; padding:14px 18px 12px; background:var(--surface);
+    border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px;
+  }
+  header img{width:44px;height:44px;border-radius:50%;box-shadow:var(--shadow);}
+  header h1{margin:0;font-size:1.05rem;font-weight:700;color:var(--primary-dark);}
+  header p{margin:2px 0 0;font-size:.78rem;color:var(--text-muted);}
+  .disclaimer{
+    flex:0 0 auto; margin:10px 18px 0; padding:10px 12px; background:var(--surface-alt);
+    border:1px solid var(--border); border-radius:10px; font-size:.76rem; line-height:1.35; color:var(--text-muted);
+  }
+  .disclaimer strong{color:var(--text);}
+  main{flex:1 1 auto; overflow-y:auto; overflow-anchor:none; padding:16px 18px 8px; display:flex; flex-direction:column; gap:12px;}
+  .stage{display:flex;flex-direction:column;gap:14px;padding:6px 2px 18px;}
+  .stage h2{font-size:1.15rem;margin:4px 0 0;}
+  .stage p{margin:0;color:var(--text-muted);font-size:.9rem;line-height:1.45;max-width:46ch;}
+  .chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;}
+  .chip{
+    border:1px solid var(--border); background:var(--surface); color:var(--text);
+    padding:9px 13px; border-radius:999px; font-size:.82rem; cursor:pointer; text-align:left; box-shadow:var(--shadow);
+  }
+  .chip:hover{border-color:var(--primary);}
+  .msg{max-width:82%;padding:11px 14px;border-radius:16px;font-size:.92rem;line-height:1.5;word-wrap:break-word;box-shadow:var(--shadow);}
+  .msg.user{align-self:flex-end;background:var(--bubble-user);color:var(--bubble-user-text);border-bottom-right-radius:5px;white-space:pre-wrap;}
+  .msg.bot{align-self:flex-start;background:var(--bubble-bot);color:var(--bubble-bot-text);border:1px solid var(--border);border-bottom-left-radius:5px;}
+  .msg.bot.thinking{color:var(--text-muted);font-style:italic;}
+  .msg.error{align-self:flex-start;background:var(--danger-bg);border:1px solid var(--danger-border);color:var(--danger-text);white-space:pre-wrap;}
+  .msg.bot p{margin:0 0 10px;}
+  .msg.bot p:last-child{margin-bottom:0;}
+  .msg.bot ul{margin:2px 0 10px;padding-left:20px;}
+  .msg.bot ul:last-child{margin-bottom:0;}
+  .msg.bot li{margin-bottom:4px;}
+  .msg.bot strong{color:var(--primary-dark);}
+  @media (prefers-color-scheme: dark){ .msg.bot strong{color:var(--primary);} }
+  form#composer{
+    flex:0 0 auto; display:flex; gap:10px; align-items:flex-end;
+    padding:10px 18px calc(12px + env(safe-area-inset-bottom,0px)); background:var(--surface); border-top:1px solid var(--border);
+  }
+  #composer textarea{
+    flex:1 1 auto; resize:none; max-height:120px; min-height:48px; padding:11px 14px; border-radius:14px;
+    border:1px solid var(--border); background:var(--bg); color:var(--text); font:inherit; font-size:16px; line-height:1.4;
+  }
+  #composer textarea:focus{outline:2px solid var(--primary);outline-offset:1px;}
+  #composer button{
+    flex:0 0 auto; height:44px; padding:0 18px; border:none; border-radius:14px;
+    background:var(--primary); color:#fff; font-weight:700; font-size:.9rem; cursor:pointer;
+  }
+  #composer button:disabled{opacity:.55;cursor:default;}
+  #attachBtn{
+    flex:0 0 auto; width:48px; height:48px; border-radius:14px; border:1.5px solid var(--border);
+    background:var(--surface-alt); color:var(--text); cursor:pointer;
+    display:flex; align-items:center; justify-content:center;
+  }
+  #attachBtn svg{ width:23px; height:23px; }
+  #attachBtn:disabled{opacity:.55;cursor:default;}
+  #attachChip{
+    display:none; align-items:center; gap:8px; margin:0 18px 8px; padding:8px 12px;
+    background:var(--surface-alt); border:1px solid var(--border); border-radius:10px; font-size:.82rem; color:var(--text);
+  }
+  #attachChip.visible{display:inline-flex;}
+  #attachChip button{border:none;background:none;color:var(--text-muted);cursor:pointer;font-size:1rem;line-height:1;padding:0 2px;}
+  .msg .att{display:block;font-size:.78rem;opacity:.8;margin-bottom:4px;}
+  @media (max-width:420px){ .msg{max-width:90%;} }
+</style>
+</head>
+<body>
+  <header>
+    <img src="/logo.jpg" alt="Baby Mathew">
+    <div style="flex:1 1 auto;">
+      <h1>Baby Mathew</h1>
+      <p>Orientación 24/7 para embarazo y bebé (0-24 meses)</p>
+    </div>
+    <button id="newChatBtn" type="button" title="Empezar una conversación nueva" style="flex:0 0 auto;border:1px solid var(--border);background:var(--surface-alt);color:var(--text-muted);border-radius:10px;padding:7px 11px;font-size:.76rem;cursor:pointer;">Nueva conversación</button>
+  </header>
+
+  <div class="disclaimer">
+    <strong>Aviso.</strong> Soy un asistente informativo, no un profesional de la salud. No diagnostico ni prescribo. Ante cualquier duda urgente, contacta siempre a tu médico o acude a urgencias. Puedes adjuntar un documento (PDF, imagen o texto) con el ícono 📎; lo uso solo para responder tu pregunta, no queda guardado. Tu conversación se guarda únicamente en este navegador para que puedas continuarla luego — no se envía a nadie más ni queda en nuestros servidores.
+  </div>
+
+  <main id="main">
+    <div class="stage" id="stage">
+      <h2>¿En qué te puedo orientar hoy?</h2>
+      <p>Cuéntame si estás en semana de embarazo o ya nació el bebé (y su edad), y te oriento sobre sueño, alimentación, desarrollo, síntomas esperables y señales de alarma — desde el nacimiento hasta los 2 años.</p>
+      <div class="chips" id="chips">
+        <button class="chip" type="button" data-q="Tengo 32 semanas de embarazo y siento un dolor fuerte en la espalda baja, ¿es normal?">"Tengo 32 semanas y me duele mucho la espalda, ¿es normal?"</button>
+        <button class="chip" type="button" data-q="Mi bebé tiene 2 meses y se despierta cada 2 horas en la noche, ¿es normal a esta edad?">"Mi bebé de 2 meses se despierta cada 2 horas, ¿es normal?"</button>
+        <button class="chip" type="button" data-q="Mi hijo tiene 14 meses y todavía no camina solo, ¿debo preocuparme?">"Mi hijo de 14 meses no camina solo, ¿debo preocuparme?"</button>
+        <button class="chip" type="button" data-q="¿Cómo empiezo la alimentación complementaria a los 6 meses?">"¿Cómo empiezo la alimentación complementaria a los 6 meses?"</button>
+      </div>
+    </div>
+  </main>
+
+  <div id="attachChip">
+    <span id="attachName"></span>
+    <button id="attachRemove" type="button" aria-label="Quitar archivo">✕</button>
+  </div>
+
+  <form id="composer">
+    <input id="fileInput" type="file" accept=".pdf,.txt,image/jpeg,image/png,image/webp" style="display:none">
+    <button id="attachBtn" type="button" title="Adjuntar documento (PDF, imagen o texto)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/></svg></button>
+    <textarea id="input" rows="1" placeholder="Escribe tu pregunta..." aria-label="Tu pregunta"></textarea>
+    <button id="send" type="submit">Enviar</button>
+  </form>
+
+<script>
+(function(){
+  "use strict";
+  var main = document.getElementById("main");
+  var stage = document.getElementById("stage");
+  var chips = document.getElementById("chips");
+  var form = document.getElementById("composer");
+  var input = document.getElementById("input");
+  var sendBtn = document.getElementById("send");
+  var attachBtn = document.getElementById("attachBtn");
+  var fileInput = document.getElementById("fileInput");
+  var attachChip = document.getElementById("attachChip");
+  var attachName = document.getElementById("attachName");
+  var attachRemove = document.getElementById("attachRemove");
+  var newChatBtn = document.getElementById("newChatBtn");
+
+  var STORAGE_KEY = "babymathew_chat_v1";
+  var turns = [];
+  var busy = false;
+  var pendingFile = null; // { name, media_type, data (base64) }
+  var MAX_FILE_BYTES = 10 * 1024 * 1024;
+
+  function scrollToBottom(){ main.scrollTop = main.scrollHeight; }
+
+  // Desplaza hasta el inicio de un mensaje (en vez del final del chat), para que
+  // al llegar una respuesta larga del asistente se lea desde el principio sin
+  // tener que subir manualmente.
+  function scrollToStart(el){
+    // Se aplica en el siguiente frame (dos rAF) para asegurar que el
+    // navegador ya recalculó el alto del mensaje largo, y se repite una vez
+    // más 150ms después como respaldo: en Safari iOS el contenedor de chat
+    // puede "re-anclar" el scroll al fondo cuando el contenido cambia de
+    // tamaño justo después de nuestro ajuste, dejando al usuario otra vez
+    // al final del mensaje.
+    function apply(){ main.scrollTop = el.offsetTop - 10; }
+    requestAnimationFrame(function(){
+      requestAnimationFrame(apply);
+    });
+    setTimeout(apply, 150);
+  }
+
+  function saveHistory(){
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(turns)); } catch (e) { /* localStorage no disponible (modo privado, etc.) */ }
+  }
+
+  function loadHistory(){
+    try {
+      var raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      var parsed = JSON.parse(raw);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch (e) { return []; }
+  }
+
+  function clearHistory(){
+    try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* no-op */ }
+  }
+
+  function escapeHtml(s){
+    return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  }
+
+  // Convierte un subconjunto simple de Markdown (encabezados #, negrita **, listas -)
+  // a HTML seguro (todo el texto se escapa primero), para que las respuestas del
+  // asistente se vean limpias en vez de mostrar los símbolos literales.
+  function renderMarkdownLite(text){
+    var escaped = escapeHtml(text);
+    var lines = escaped.split(/\r?\n/);
+    var html = "";
+    var inList = false;
+
+    function closeList(){ if (inList) { html += "</ul>"; inList = false; } }
+    function inline(s){
+      s = s.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
+      s = s.replace(/^#{1,6}\s*/, ""); // por si queda un # suelto dentro de línea
+      return s;
+    }
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+      var heading = line.match(/^#{1,6}\s+(.*)$/);
+      var item = line.match(/^[-*•]\s+(.*)$/);
+      if (heading) {
+        closeList();
+        html += "<p><strong>" + inline(heading[1]) + "</strong></p>";
+      } else if (item) {
+        if (!inList) { html += "<ul>"; inList = true; }
+        html += "<li>" + inline(item[1]) + "</li>";
+      } else {
+        closeList();
+        if (line.trim() === "") continue; // colapsa líneas vacías (el <p> ya da espaciado)
+        html += "<p>" + inline(line) + "</p>";
+      }
+    }
+    closeList();
+    return html || "<p></p>";
+  }
+
+  function addMessage(role, text, attachmentName){
+    var el = document.createElement("div");
+    el.className = "msg " + role;
+    if (attachmentName) {
+      var att = document.createElement("span");
+      att.className = "att";
+      att.textContent = "📎 " + attachmentName;
+      el.appendChild(att);
+    }
+    var isBot = role.indexOf("bot") === 0;
+    if (isBot) {
+      var content = document.createElement("span");
+      content.innerHTML = renderMarkdownLite(text);
+      el.appendChild(content);
+    } else {
+      el.appendChild(document.createTextNode(text));
+    }
+    main.appendChild(el);
+    scrollToBottom();
+    return el;
+  }
+
+  function hideStage(){ if (stage && stage.parentNode) stage.parentNode.removeChild(stage); }
+
+  function setBusy(b){
+    busy = b;
+    sendBtn.disabled = b;
+    input.disabled = b;
+    attachBtn.disabled = b;
+  }
+
+  function clearAttachment(){
+    pendingFile = null;
+    fileInput.value = "";
+    attachChip.classList.remove("visible");
+    attachName.textContent = "";
+  }
+
+  function fileToBase64(file){
+    return new Promise(function(resolve, reject){
+      var reader = new FileReader();
+      reader.onload = function(){
+        var result = reader.result || "";
+        var comma = result.indexOf(",");
+        resolve(comma >= 0 ? result.slice(comma + 1) : result);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  attachBtn.addEventListener("click", function(){ if (!busy) fileInput.click(); });
+
+  fileInput.addEventListener("change", async function(){
+    var file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    if (file.size > MAX_FILE_BYTES) {
+      addMessage("error", "Ese archivo pesa más de 10 MB. Intenta con una versión más liviana.");
+      fileInput.value = "";
+      return;
+    }
+    var data = await fileToBase64(file);
+    pendingFile = { name: file.name, media_type: file.type || "application/octet-stream", data: data };
+    attachName.textContent = file.name;
+    attachChip.classList.add("visible");
+  });
+
+  attachRemove.addEventListener("click", clearAttachment);
+
+  async function ask(userText, file){
+    hideStage();
+    var displayText = userText || "Te comparto este documento, ¿me puedes orientar sobre su contenido?";
+    addMessage("user", displayText, file ? file.name : null);
+    turns.push({ role: "user", content: displayText });
+    saveHistory();
+
+    var botEl = addMessage("bot thinking", "Pensando...");
+    setBusy(true);
+
+    try {
+      var payload = { messages: turns };
+      if (file) payload.document = { name: file.name, media_type: file.media_type, data: file.data };
+
+      var res = await fetch("/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      var data = await res.json();
+      botEl.classList.remove("thinking");
+      if (!res.ok && !data.reply) {
+        botEl.remove();
+        addMessage("error", "No pude conectarme con el servidor. Intenta de nuevo.");
+      } else {
+        botEl.innerHTML = renderMarkdownLite(data.reply);
+        turns.push({ role: "assistant", content: data.reply });
+        saveHistory();
+        scrollToStart(botEl);
+      }
+    } catch (e) {
+      botEl.remove();
+      addMessage("error", "No pude conectarme con el servidor. Revisa tu conexión e intenta de nuevo.");
+      scrollToBottom();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  form.addEventListener("submit", function(ev){
+    ev.preventDefault();
+    if (busy) return;
+    var text = input.value.trim();
+    var file = pendingFile;
+    if (!text && !file) return;
+    input.value = "";
+    input.style.height = "auto";
+    clearAttachment();
+    ask(text, file);
+  });
+
+  input.addEventListener("keydown", function(ev){
+    if (ev.key === "Enter" && !ev.shiftKey) {
+      ev.preventDefault();
+      form.requestSubmit();
+    }
+  });
+  input.addEventListener("input", function(){
+    input.style.height = "auto";
+    input.style.height = Math.min(input.scrollHeight, 120) + "px";
+  });
+
+  chips.addEventListener("click", function(ev){
+    var btn = ev.target.closest(".chip");
+    if (!btn || busy) return;
+    ask(btn.getAttribute("data-q"));
+  });
+
+  newChatBtn.addEventListener("click", function(){
+    if (busy) return;
+    if (turns.length && !confirm("¿Empezar una conversación nueva? Se borrará el historial guardado en este navegador.")) return;
+    clearHistory();
+    location.reload();
+  });
+
+  // Restaura el historial guardado en este navegador, si existe
+  (function restoreHistory(){
+    var saved = loadHistory();
+    if (!saved.length) return;
+    hideStage();
+    for (var i = 0; i < saved.length; i++) {
+      var t = saved[i];
+      if (t && (t.role === "user" || t.role === "assistant") && typeof t.content === "string") {
+        addMessage(t.role === "user" ? "user" : "bot", t.content);
+      }
+    }
+    turns = saved;
+    scrollToBottom();
+  })();
+})();
+</script>
+</body>
+</html>
