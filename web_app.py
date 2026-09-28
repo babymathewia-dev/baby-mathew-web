@@ -424,7 +424,18 @@ def chat():
         response = anthropic_client.messages.create(
             model=MODEL,
             max_tokens=800,
-            system=FULL_SYSTEM_PROMPT,
+            # Prompt caching: el system prompt + bases de conocimiento (~10k tokens)
+            # no cambian entre mensajes, así que se marcan como cacheables (cache_control
+            # ephemeral). Esto reduce fuertemente el costo y la latencia de cada turno,
+            # ya que Anthropic reutiliza el procesamiento de ese bloque en vez de
+            # reprocesarlo completo en cada llamada.
+            system=[
+                {
+                    "type": "text",
+                    "text": FULL_SYSTEM_PROMPT,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ],
             messages=cleaned,
             tools=[WEB_SEARCH_TOOL],
         )
