@@ -1,0 +1,22 @@
+# Secretos y configuración local — NUNCA deben llegar al repo
+.env
+.env.*
+*.pem
+*.key
+
+# Base de datos local (contiene datos de usuarios reales)
+*.db
+*.sqlite
+*.sqlite3
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+*.egg-info/
+
+# Sistema / editor
+.DS_Store
+.vscode/
+.idea/
