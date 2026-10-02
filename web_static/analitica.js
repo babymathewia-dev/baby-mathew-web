@@ -26,7 +26,10 @@ window.dataLayer = window.dataLayer || [];
           body.forEach(function (v) { if (v instanceof File) hay = true; });
           return hay;
         }
-        if (typeof body === 'string') return /"(file|attachment|archivo)[^"]*"\s*:\s*[{"\[]/i.test(body);
+        if (typeof body === 'string') {
+          // Formato actual: "documents": [ {...} ] (o "document": {...} en clientes viejos)
+          return /"(documents?|files?|attachments?|archivos?)"\s*:\s*(\{|\[\s*\{)/i.test(body);
+        }
       } catch (e) {}
       return false;
     }
