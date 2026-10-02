@@ -21,6 +21,7 @@ import base64
 import logging
 import sqlite3
 from pathlib import Path
+from concurrent.futures import ThreadPoolExecutor
 
 from flask import Flask, request, jsonify, send_from_directory, session, redirect, url_for
 import anthropic
@@ -47,6 +48,8 @@ load_dotenv_simple(BASE_DIR / ".env")
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 MODEL = os.environ.get("ANTHROPIC_MODEL", "claude-sonnet-4-5")
+# [ANALÍTICA] Modelo pequeño y barato solo para clasificar el tema de cada pregunta.
+CLASSIFIER_MODEL = os.environ.get("CLASSIFIER_MODEL", "claude-haiku-4-5")
 
 if not ANTHROPIC_API_KEY:
     raise SystemExit("Falta la variable de entorno ANTHROPIC_API_KEY (revisa tu archivo .env).")
@@ -126,6 +129,63 @@ MAX_DOCS_PER_MESSAGE = 5  # tope de archivos/fotos adjuntos por mensaje
 MAX_MESSAGE_CHARS = 4000  # tope por mensaje de usuario (control de costo de tokens)
 
 # ---------------------------------------------------------------------------
+# [ANALÍTICA] Clasificación de temas — NO ELIMINAR
+# Asigna cada pregunta a UNA categoría fija. Solo la categoría viaja a la
+# página (campo "tema" de /api/chat) y de ahí a Google Analytics. El texto de la
+# pregunta nunca se registra en logs ni se envía a GA4.
+# ---------------------------------------------------------------------------
+
+TEMAS = [
+    "Síntomas del embarazo",
+    "Nutrición en el embarazo",
+    "Controles y exámenes",
+    "Parto y preparación",
+    "Señales de alarma embarazo",
+    "Sueño del bebé",
+    "Lactancia",
+    "Alimentación complementaria",
+    "Desarrollo y hitos",
+    "Vacunas",
+    "Síntomas y enfermedades del bebé",
+    "Cuidados del recién nacido",
+    "Señales de alarma bebé",
+    "Bienestar emocional de los padres",
+    "Saludo o uso del bot",
+    "Otro",
+]
+
+CLASSIFIER_PROMPT = (
+    "Clasifica la consulta de un padre o madre en EXACTAMENTE una de estas categorías:\n"
+    + "\n".join(f"- {t}" for t in TEMAS)
+    + "\n\nResponde solo con el nombre exacto de la categoría, sin explicaciones."
+)
+
+_classifier_pool = ThreadPoolExecutor(max_workers=4)
+
+
+def classify_topic(user_texts):
+    """Devuelve una categoría de TEMAS. Nunca lanza error: ante cualquier fallo, 'Otro'."""
+    try:
+        consulta = "\n---\n".join(t[:1500] for t in user_texts if t)
+        if not consulta.strip():
+            return "Otro"
+        resp = anthropic_client.with_options(timeout=15).messages.create(
+            model=CLASSIFIER_MODEL,
+            max_tokens=20,
+            system=CLASSIFIER_PROMPT,
+            messages=[{"role": "user", "content": consulta}],
+        )
+        etiqueta = "".join(b.text for b in resp.content if b.type == "text").strip().strip(".").strip()
+        for t in TEMAS:
+            if etiqueta.lower() == t.lower():
+                return t
+        logger.info("clasificador_etiqueta_no_reconocida")  # nunca se registra el texto
+        return "Otro"
+    except Exception as e:
+        logger.warning("No se pudo clasificar el tema (se usa 'Otro'): %s", type(e).__name__)
+        return "Otro"
+
+# ---------------------------------------------------------------------------
 # App Flask
 # ---------------------------------------------------------------------------
 
@@ -180,11 +240,14 @@ def set_security_headers(response):
     # navegador lo bloqueará.
     response.headers["Content-Security-Policy"] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline'; "               # todo el JS es propio (inline en index.html + /analitica.js)
+        # [ANALÍTICA] googletagmanager.com: script de Google Analytics que carga /analitica.js. NO QUITAR.
+        "script-src 'self' 'unsafe-inline' https://www.googletagmanager.com; "
         "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "  # CSS propio + Google Fonts
         "font-src https://fonts.gstatic.com; "
-        "img-src 'self' data: https://lh3.googleusercontent.com https://*.googleusercontent.com; "  # fotos de perfil de Google
-        "connect-src 'self'; "                                # fetch() solo llama a nuestra propia API
+        "img-src 'self' data: https://lh3.googleusercontent.com https://*.googleusercontent.com "  # fotos de perfil de Google
+        "https://*.google-analytics.com https://www.googletagmanager.com; "  # [ANALÍTICA] GA4. NO QUITAR.
+        # [ANALÍTICA] Envío de datos a Google Analytics 4 (dominios oficiales de GA4). NO QUITAR.
+        "connect-src 'self' https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com; "
         "frame-ancestors 'none'; "                            # nadie puede embeber el sitio en un iframe (clickjacking)
         "base-uri 'self'; "
         "form-action 'self' https://accounts.google.com; "
@@ -443,6 +506,11 @@ def chat():
     # esta respuesta — coincide con lo que promete el aviso de privacidad).
     last_user_text = cleaned[-1]["content"]
 
+    # [ANALÍTICA] Clasificación del tema en paralelo a la respuesta (no suma espera).
+    # Usa las 2 últimas preguntas para entender seguimientos cortos.
+    ultimas_preguntas = [m["content"] for m in cleaned if m["role"] == "user" and isinstance(m["content"], str)][-2:]
+    tema_futuro = _classifier_pool.submit(classify_topic, ultimas_preguntas)
+
     # Si vienen documentos/fotos adjuntos, se agregan al último mensaje del usuario
     if documents:
         blocks = [{"type": "text", "text": last_user_text}]
@@ -549,7 +617,14 @@ def chat():
         except Exception:
             logger.exception("No se pudo guardar el intercambio en el historial del usuario")
 
-    return jsonify({"reply": reply_text})
+    # [ANALÍTICA] Tema de la consulta (solo la categoría, nunca el texto)
+    try:
+        tema = tema_futuro.result(timeout=5)
+    except Exception:
+        tema = "Otro"
+    logger.info("consulta_respondida tema=%s", tema)
+
+    return jsonify({"reply": reply_text, "tema": tema})
 
 
 @app.errorhandler(429)
