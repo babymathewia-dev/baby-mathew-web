@@ -161,9 +161,49 @@
     border:1px solid var(--border); background:var(--surface-alt); color:var(--text-muted);
     display:flex; align-items:center; justify-content:center; cursor:pointer;
   }
+  /* Modal de aceptación de Términos y Política de Datos (num. 2 y 16) */
+  #termsOverlay{
+    position:fixed; inset:0; background:rgba(14,23,22,.55); z-index:100;
+    display:flex; align-items:center; justify-content:center; padding:18px;
+  }
+  #termsOverlay.hidden{display:none;}
+  #termsModal{
+    background:var(--surface); border-radius:18px; max-width:420px; width:100%;
+    padding:22px 22px 20px; box-shadow:0 10px 40px rgba(20,50,47,.28);
+  }
+  #termsModal h2{margin:0 0 8px; font-size:1.05rem;}
+  #termsModal p{font-size:.86rem; color:var(--text-muted); line-height:1.45; margin:0 0 14px;}
+  #termsModal a{color:var(--primary-dark); font-weight:700;}
+  .terms-check{
+    display:flex; align-items:flex-start; gap:9px; font-size:.82rem; color:var(--text);
+    background:var(--surface-alt); border:1px solid var(--border); border-radius:12px;
+    padding:11px 12px; margin-bottom:14px; cursor:pointer;
+  }
+  .terms-check input{margin-top:2px; width:16px; height:16px; flex:0 0 auto;}
+  #termsAcceptBtn{
+    width:100%; height:44px; border:none; border-radius:14px; background:var(--primary);
+    color:#fff; font-weight:700; font-size:.9rem; cursor:pointer;
+  }
+  #termsAcceptBtn:disabled{opacity:.5; cursor:default;}
 </style>
 </head>
 <body>
+  <div id="termsOverlay" class="hidden">
+    <div id="termsModal" role="dialog" aria-modal="true" aria-labelledby="termsModalTitle">
+      <h2 id="termsModalTitle">Antes de empezar</h2>
+      <p>Baby Mathew es un asistente informativo y no sustituye a un profesional de la salud. Para usarlo,
+      necesitamos tu aceptación de los <a href="/terminos.html" target="_blank" rel="noopener">Términos y la
+      Política de Tratamiento de Datos</a>. Si en algún momento nos cuentas algo sobre tu salud, el embarazo o
+      el bebé, esa autorización también cubre ese dato sensible — nunca es obligatorio compartirlo.</p>
+      <label class="terms-check">
+        <input type="checkbox" id="termsCheckbox">
+        <span>He leído y acepto los Términos y la Política de Tratamiento de Datos Personales de Baby Mathew
+        IA, incluida la autorización para tratar los datos sensibles de salud que decida compartir.</span>
+      </label>
+      <button type="button" id="termsAcceptBtn" disabled>Aceptar y continuar</button>
+    </div>
+  </div>
+
   <header>
     <img src="/logo.jpg" alt="Baby Mathew">
     <div class="titleBlock">
@@ -222,6 +262,10 @@
       <a href="https://www.tiktok.com/@baby.mathew.ia" target="_blank" rel="noopener" class="more-menu-item" id="menuTikTok" role="menuitem">
         <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.6 5.82c-.84-.73-1.38-1.77-1.5-2.93h-3.03v13.44a3.03 3.03 0 1 1-2.14-2.9V10.3a6.1 6.1 0 1 0 5.17 6.03V9.57a8.13 8.13 0 0 0 4.75 1.53V8.07c-1.19 0-2.3-.4-3.25-1.08l0 0z"/></svg></span>
         Síguenos en TikTok
+      </a>
+      <a href="/terminos.html" target="_blank" rel="noopener" class="more-menu-item" id="menuTerms" role="menuitem">
+        <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg></span>
+        Términos y privacidad
       </a>
     </div>
     <textarea id="input" rows="1" placeholder="Escribe tu pregunta..." aria-label="Tu pregunta"></textarea>
@@ -662,6 +706,33 @@
 
   // Al cargar: revisa si hay sesión de Google iniciada y, según eso, restaura
   // el historial desde el servidor (cuenta) o desde este navegador (anónimo).
+  // --- Aceptación de Términos / Política de Datos (num. 2 y 16 del documento legal) ---
+  var TERMS_VERSION = "2026-10-01"; // debe coincidir con TERMS_VERSION en web_app.py
+  var termsOverlay = document.getElementById("termsOverlay");
+  var termsCheckbox = document.getElementById("termsCheckbox");
+  var termsAcceptBtn = document.getElementById("termsAcceptBtn");
+
+  function localTermsAccepted(){
+    try { return localStorage.getItem("bm_terms_accepted_" + TERMS_VERSION) === "1"; }
+    catch (e) { return false; }
+  }
+  function setLocalTermsAccepted(){
+    try { localStorage.setItem("bm_terms_accepted_" + TERMS_VERSION, "1"); } catch (e) {}
+  }
+  function showTermsGate(){ termsOverlay.classList.remove("hidden"); }
+  function hideTermsGate(){ termsOverlay.classList.add("hidden"); }
+
+  termsCheckbox.addEventListener("change", function(){
+    termsAcceptBtn.disabled = !termsCheckbox.checked;
+  });
+  termsAcceptBtn.addEventListener("click", async function(){
+    setLocalTermsAccepted();
+    hideTermsGate();
+    try {
+      await fetch("/api/accept-terms", { method: "POST" });
+    } catch (e) { /* si falla, la evidencia local ya quedó guardada */ }
+  });
+
   (async function init(){
     var me = { logged_in: false };
     try {
@@ -670,6 +741,15 @@
     } catch (e) { /* si falla, se sigue en modo anónimo/local */ }
 
     applyAuthUI(me);
+
+    // Para usuarios logueados, la cuenta manda (persiste entre dispositivos);
+    // para anónimos, solo tenemos el navegador actual.
+    var alreadyAccepted = me.logged_in ? !!me.terms_accepted : localTermsAccepted();
+    if (!alreadyAccepted) {
+      showTermsGate();
+    } else if (me.logged_in) {
+      setLocalTermsAccepted(); // evita mostrarla de nuevo si luego cierra sesión en este mismo navegador
+    }
 
     if (loggedIn) {
       try {
