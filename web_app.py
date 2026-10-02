@@ -155,29 +155,49 @@ TEMAS = [
 ]
 
 CLASSIFIER_PROMPT = (
-    "Clasifica la consulta de un padre o madre en EXACTAMENTE una de estas categorías:\n"
+    "Clasifica la PREGUNTA ACTUAL de un padre o madre en EXACTAMENTE una de estas categorías:\n"
     + "\n".join(f"- {t}" for t in TEMAS)
-    + "\n\nResponde solo con el nombre exacto de la categoría, sin explicaciones."
+    + "\n\nLa PREGUNTA ANTERIOR (si viene) es solo contexto: úsala únicamente si la actual es un "
+    "seguimiento corto que no se entiende sola (ej. '¿y si tiene fiebre?'). Si la actual cambia de "
+    "tema, clasifica el tema NUEVO.\n"
+    "Responde solo con el nombre exacto de la categoría, sin explicaciones ni comillas."
 )
 
 _classifier_pool = ThreadPoolExecutor(max_workers=4)
 
 
-def classify_topic(user_texts):
+def _normalizar(texto):
+    import unicodedata
+    texto = unicodedata.normalize("NFD", texto.lower())
+    texto = "".join(c for c in texto if unicodedata.category(c) != "Mn")
+    return " ".join("".join(c if c.isalnum() else " " for c in texto).split())
+
+
+_TEMAS_NORM = sorted(((_normalizar(t), t) for t in TEMAS), key=lambda x: -len(x[0]))
+
+
+def classify_topic(pregunta_actual, pregunta_anterior=None):
     """Devuelve una categoría de TEMAS. Nunca lanza error: ante cualquier fallo, 'Otro'."""
     try:
-        consulta = "\n---\n".join(t[:1500] for t in user_texts if t)
-        if not consulta.strip():
+        if not (pregunta_actual or "").strip():
             return "Otro"
+        consulta = f"PREGUNTA ACTUAL:\n{pregunta_actual[:1500]}"
+        if pregunta_anterior:
+            consulta = f"PREGUNTA ANTERIOR (solo contexto):\n{pregunta_anterior[:800]}\n\n" + consulta
         resp = anthropic_client.with_options(timeout=15).messages.create(
             model=CLASSIFIER_MODEL,
-            max_tokens=20,
+            max_tokens=30,
             system=CLASSIFIER_PROMPT,
             messages=[{"role": "user", "content": consulta}],
         )
-        etiqueta = "".join(b.text for b in resp.content if b.type == "text").strip().strip(".").strip()
-        for t in TEMAS:
-            if etiqueta.lower() == t.lower():
+        etiqueta = _normalizar("".join(b.text for b in resp.content if b.type == "text"))
+        # Coincidencia exacta y, si no, la categoría contenida en la respuesta
+        # (tolera tildes, comillas, puntos o prefijos como "Categoría:").
+        for norm, t in _TEMAS_NORM:
+            if etiqueta == norm:
+                return t
+        for norm, t in _TEMAS_NORM:
+            if norm in etiqueta:
                 return t
         logger.info("clasificador_etiqueta_no_reconocida")  # nunca se registra el texto
         return "Otro"
@@ -507,9 +527,11 @@ def chat():
     last_user_text = cleaned[-1]["content"]
 
     # [ANALÍTICA] Clasificación del tema en paralelo a la respuesta (no suma espera).
-    # Usa las 2 últimas preguntas para entender seguimientos cortos.
-    ultimas_preguntas = [m["content"] for m in cleaned if m["role"] == "user" and isinstance(m["content"], str)][-2:]
-    tema_futuro = _classifier_pool.submit(classify_topic, ultimas_preguntas)
+    # Clasifica la pregunta actual; la anterior solo sirve de contexto para seguimientos cortos.
+    preguntas = [m["content"] for m in cleaned if m["role"] == "user" and isinstance(m["content"], str)]
+    tema_futuro = _classifier_pool.submit(
+        classify_topic, preguntas[-1] if preguntas else "", preguntas[-2] if len(preguntas) > 1 else None
+    )
 
     # Si vienen documentos/fotos adjuntos, se agregan al último mensaje del usuario
     if documents:
