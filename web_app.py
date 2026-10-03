@@ -207,6 +207,16 @@ def classify_topic(pregunta_actual, pregunta_anterior=None):
 
 # ---------------------------------------------------------------------------
 # App Flask
+#
+# IMPORTANTE — comando de arranque en Render: el worker de gunicorn tiene un
+# timeout propio (30s por defecto) que no se configura aquí sino en el Start
+# Command de Render (p.ej. "gunicorn web_app:app --timeout 75 --workers 2").
+# Si ese valor es menor al timeout de 55s que se le pone a la llamada
+# principal a la IA (ver /api/chat), gunicorn puede matar el proceso antes de
+# que nuestro propio manejo de errores alcance a responder, y el usuario
+# vuelve a ver el mensaje genérico de "no pude conectarme" en vez del mensaje
+# claro que sí devolvemos nosotros. Verifica ese Start Command en el panel de
+# Render — debe ser de al menos 75s.
 # ---------------------------------------------------------------------------
 
 app = Flask(__name__, static_folder="web_static", static_url_path="")
@@ -584,7 +594,18 @@ def chat():
             cleaned[-1] = {"role": "user", "content": blocks}
 
     try:
-        response = anthropic_client.messages.create(
+        # with_options(timeout=...): antes esta llamada no tenía tope propio,
+        # así que cuando tardaba demasiado (búsqueda web + imagen pesada, por
+        # ejemplo) el proceso de gunicorn la mataba a la fuerza ANTES de que
+        # el except de abajo pudiera actuar — el navegador recibía una
+        # respuesta vacía o cortada (no JSON) y el único mensaje que podía
+        # mostrar era el genérico de "no pude conectarme", aunque la conexión
+        # del usuario estuviera perfecta. Con este tope, si la IA tarda
+        # demasiado, Python lanza la excepción primero y sí devolvemos un
+        # JSON claro. 55s deja margen bajo el --timeout de gunicorn en Render
+        # (ver nota en el comando de arranque / README_WEB.md) — si ese valor
+        # cambia allá, este número debe quedar varios segundos por debajo.
+        response = anthropic_client.with_options(timeout=55).messages.create(
             model=MODEL,
             # 800 se quedaba corto y cortaba respuestas a mitad de palabra,
             # sobre todo cuando se usa la herramienta de búsqueda web (esas
@@ -612,6 +633,14 @@ def chat():
         reply_text = "".join(
             block.text for block in response.content if block.type == "text"
         ).strip()
+    except anthropic.APITimeoutError:
+        logger.warning("Timeout llamando a la API de IA (>55s)")
+        return jsonify({
+            "error": "upstream_timeout",
+            "reply": "Esta pregunta tardó más de lo normal en procesarse (puede pasar cuando busco información "
+                     "actualizada en internet) y tuve que detenerme. Intenta de nuevo — normalmente la segunda "
+                     "vez responde rápido. Si es urgente, no esperes: contacta a tu médico o acude a urgencias."
+        }), 200
     except Exception:
         logger.exception("Error llamando a la API de IA")
         return jsonify({
