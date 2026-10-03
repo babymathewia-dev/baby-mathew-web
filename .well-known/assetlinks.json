@@ -1,1 +1,8 @@
-
+[{
+  "relation": ["delegate_permission/common.handle_all_urls"],
+  "target": {
+    "namespace": "android_app",
+    "package_name": "com.babymathewia.app",
+    "sha256_cert_fingerprints": ["EF:1E:EE:CF:42:A0:F5:61:61:DA:52:44:6E:37:EA:E1:60:EB:6E:FF:A5:A6:A4:48:D8:F0:3D:A1:01:BA:27:7E"]
+  }
+}]
