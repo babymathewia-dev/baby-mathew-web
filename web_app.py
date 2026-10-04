@@ -17,13 +17,14 @@ a ambos canales sin tocar código.
 """
 
 import os
+import json
 import base64
 import logging
 import sqlite3
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
-from flask import Flask, request, jsonify, send_from_directory, session, redirect, url_for
+from flask import Flask, request, jsonify, send_from_directory, session, redirect, url_for, Response, stream_with_context
 import anthropic
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -109,6 +110,31 @@ WEB_SEARCH_TOOL = {
     "name": "web_search",
     "max_uses": 3,
 }
+
+# Antes, web_search viajaba en TODAS las consultas (incluidas las de sueño,
+# lactancia, vacunas, etc. que el modelo ya sabe responder solo), y cada vez
+# que el modelo decidía buscar, la respuesta tardaba varios segundos más —
+# a veces lo suficiente para disparar el timeout de 55s. Con esta lista de
+# disparadores solo se activa cuando la pregunta realmente necesita algo
+# actual/local (direcciones, horarios, precios, noticias), que es la
+# minoría de los casos reales de uso. No es perfecto (puede dejar pasar
+# algún caso que sí lo necesitaba), pero el costo de un falso negativo es
+# bajo: el modelo responde con lo que sabe en vez de buscar, no un error.
+_WEB_SEARCH_TRIGGERS = (
+    "donde queda", "donde esta", "direccion de", "cerca de mi", "cerca de aqui",
+    "telefono de", "numero de", "horario de", "a que hora abre", "a que hora cierra",
+    "cuanto cuesta", "precio de", "disponible en", "disponibilidad de",
+    "noticia", "ultima hora", "hoy en dia", "actualmente", "este año", "2026",
+    "ips cercana", "pediatra cerca", "farmacia cerca", "clinica cerca",
+    "hospital cerca", "eps en", "agendar cita", "pagina web", "link de", "enlace de",
+)
+
+
+def necesita_busqueda_web(texto):
+    """Heurística barata (sin llamada a la IA) para decidir si esta pregunta
+    puede necesitar información actual/local y amerita activar web_search."""
+    t = _normalizar(texto or "")
+    return any(_normalizar(disparador) in t for disparador in _WEB_SEARCH_TRIGGERS)
 
 MAX_HISTORY_TURNS = 12  # mensajes (usuario+bot) que se envían como contexto por request
 
@@ -593,89 +619,114 @@ def chat():
         else:
             cleaned[-1] = {"role": "user", "content": blocks}
 
-    try:
-        # with_options(timeout=...): antes esta llamada no tenía tope propio,
-        # así que cuando tardaba demasiado (búsqueda web + imagen pesada, por
-        # ejemplo) el proceso de gunicorn la mataba a la fuerza ANTES de que
-        # el except de abajo pudiera actuar — el navegador recibía una
-        # respuesta vacía o cortada (no JSON) y el único mensaje que podía
-        # mostrar era el genérico de "no pude conectarme", aunque la conexión
-        # del usuario estuviera perfecta. Con este tope, si la IA tarda
-        # demasiado, Python lanza la excepción primero y sí devolvemos un
-        # JSON claro. 55s deja margen bajo el --timeout de gunicorn en Render
-        # (ver nota en el comando de arranque / README_WEB.md) — si ese valor
-        # cambia allá, este número debe quedar varios segundos por debajo.
-        response = anthropic_client.with_options(timeout=55).messages.create(
-            model=MODEL,
-            # 800 se quedaba corto y cortaba respuestas a mitad de palabra,
-            # sobre todo cuando se usa la herramienta de búsqueda web (esas
-            # llamadas también consumen parte de este mismo presupuesto de
-            # tokens, dejando menos espacio para el texto final). 2048 da
-            # margen de sobra para una respuesta completa aun con búsqueda
-            # de por medio; el límite real de longitud lo pone el prompt
-            # (ver "Formato de respuesta" en system_prompt.md), no este tope.
-            max_tokens=2048,
-            # Prompt caching: el system prompt + bases de conocimiento (~10k tokens)
-            # no cambian entre mensajes, así que se marcan como cacheables (cache_control
-            # ephemeral). Esto reduce fuertemente el costo y la latencia de cada turno,
-            # ya que Anthropic reutiliza el procesamiento de ese bloque en vez de
-            # reprocesarlo completo en cada llamada.
-            system=[
-                {
-                    "type": "text",
-                    "text": FULL_SYSTEM_PROMPT,
-                    "cache_control": {"type": "ephemeral"},
-                }
-            ],
-            messages=cleaned,
-            tools=[WEB_SEARCH_TOOL],
-        )
-        reply_text = "".join(
-            block.text for block in response.content if block.type == "text"
-        ).strip()
-    except anthropic.APITimeoutError:
-        logger.warning("Timeout llamando a la API de IA (>55s)")
-        return jsonify({
-            "error": "upstream_timeout",
-            "reply": "Esta pregunta tardó más de lo normal en procesarse (puede pasar cuando busco información "
-                     "actualizada en internet) y tuve que detenerme. Intenta de nuevo — normalmente la segunda "
-                     "vez responde rápido. Si es urgente, no esperes: contacta a tu médico o acude a urgencias."
-        }), 200
-    except Exception:
-        logger.exception("Error llamando a la API de IA")
-        return jsonify({
-            "error": "upstream_error",
-            "reply": "Tuve un problema técnico respondiendo tu pregunta. Intenta de nuevo en un momento. "
-                     "Si es urgente, no esperes: contacta a tu médico o acude a urgencias."
-        }), 200
+    # web_search ya NO viaja en todas las consultas (ver necesita_busqueda_web
+    # más arriba) — solo cuando la pregunta parece necesitar algo actual/local.
+    # Esto evita el ida-y-vuelta extra de una búsqueda innecesaria, que era
+    # una de las dos causas principales de las respuestas lentas/timeout.
+    usar_busqueda = necesita_busqueda_web(last_user_text)
 
-    # Si el usuario tiene sesión iniciada (registro con Google), guarda el
-    # intercambio en su historial del servidor para que pueda continuarlo
-    # desde cualquier dispositivo.
-    if "user_id" in session:
+    # user_id se captura AHORA (dentro del contexto de la request) porque el
+    # generador de abajo corre mientras Flask va enviando la respuesta, y para
+    # entonces `session` ya podría no estar disponible de forma confiable.
+    user_id = session.get("user_id")
+
+    def generate():
+        reply_text = ""
         try:
-            conn = get_db()
-            conn.execute(
-                "INSERT INTO messages (user_id, role, content) VALUES (?, ?, ?)",
-                (session["user_id"], "user", last_user_text),
+            # with_options(timeout=...) + streaming: antes la respuesta completa
+            # se armaba del lado del servidor y solo se enviaba al final, así que
+            # el usuario veía "Pensando..." fijo mientras tanto (a veces más de
+            # 30-40s, sobre todo si el modelo decidía buscar en la web). Ahora el
+            # texto se transmite a medida que el modelo lo genera (Server-Sent
+            # Events), igual que ChatGPT/Claude.ai, y el timeout de 55s sigue
+            # protegiendo contra una llamada que nunca termina. 55s deja margen
+            # bajo el --timeout de gunicorn en Render (ver nota en el comando de
+            # arranque / README_WEB.md) — si ese valor cambia allá, este número
+            # debe quedar varios segundos por debajo.
+            create_kwargs = dict(
+                model=MODEL,
+                # 800 se quedaba corto y cortaba respuestas a mitad de palabra,
+                # sobre todo cuando se usa la herramienta de búsqueda web (esas
+                # llamadas también consumen parte de este mismo presupuesto de
+                # tokens, dejando menos espacio para el texto final). 2048 da
+                # margen de sobra para una respuesta completa aun con búsqueda
+                # de por medio; el límite real de longitud lo pone el prompt
+                # (ver "Formato de respuesta" en system_prompt.md), no este tope.
+                max_tokens=2048,
+                # Prompt caching: el system prompt + bases de conocimiento (~10k tokens)
+                # no cambian entre mensajes, así que se marcan como cacheables (cache_control
+                # ephemeral). Esto reduce fuertemente el costo y la latencia de cada turno,
+                # ya que Anthropic reutiliza el procesamiento de ese bloque en vez de
+                # reprocesarlo completo en cada llamada.
+                system=[
+                    {
+                        "type": "text",
+                        "text": FULL_SYSTEM_PROMPT,
+                        "cache_control": {"type": "ephemeral"},
+                    }
+                ],
+                messages=cleaned,
             )
-            conn.execute(
-                "INSERT INTO messages (user_id, role, content) VALUES (?, ?, ?)",
-                (session["user_id"], "assistant", reply_text),
-            )
-            conn.commit()
-            conn.close()
+            if usar_busqueda:
+                create_kwargs["tools"] = [WEB_SEARCH_TOOL]
+
+            with anthropic_client.with_options(timeout=55).messages.stream(**create_kwargs) as stream:
+                for texto in stream.text_stream:
+                    reply_text += texto
+                    yield f"data: {json.dumps({'delta': texto})}\n\n"
+        except anthropic.APITimeoutError:
+            logger.warning("Timeout llamando a la API de IA (>55s)")
+            yield "data: " + json.dumps({
+                "error": "upstream_timeout",
+                "reply": "Esta pregunta tardó más de lo normal en procesarse (puede pasar cuando busco información "
+                         "actualizada en internet) y tuve que detenerme. Intenta de nuevo — normalmente la segunda "
+                         "vez responde rápido. Si es urgente, no esperes: contacta a tu médico o acude a urgencias.",
+            }) + "\n\n"
+            return
         except Exception:
-            logger.exception("No se pudo guardar el intercambio en el historial del usuario")
+            logger.exception("Error llamando a la API de IA")
+            yield "data: " + json.dumps({
+                "error": "upstream_error",
+                "reply": "Tuve un problema técnico respondiendo tu pregunta. Intenta de nuevo en un momento. "
+                         "Si es urgente, no esperes: contacta a tu médico o acude a urgencias.",
+            }) + "\n\n"
+            return
 
-    # [ANALÍTICA] Tema de la consulta (solo la categoría, nunca el texto)
-    try:
-        tema = tema_futuro.result(timeout=5)
-    except Exception:
-        tema = "Otro"
-    logger.info("consulta_respondida tema=%s", tema)
+        # Si el usuario tiene sesión iniciada (registro con Google), guarda el
+        # intercambio en su historial del servidor para que pueda continuarlo
+        # desde cualquier dispositivo.
+        if user_id:
+            try:
+                conn = get_db()
+                conn.execute(
+                    "INSERT INTO messages (user_id, role, content) VALUES (?, ?, ?)",
+                    (user_id, "user", last_user_text),
+                )
+                conn.execute(
+                    "INSERT INTO messages (user_id, role, content) VALUES (?, ?, ?)",
+                    (user_id, "assistant", reply_text),
+                )
+                conn.commit()
+                conn.close()
+            except Exception:
+                logger.exception("No se pudo guardar el intercambio en el historial del usuario")
 
-    return jsonify({"reply": reply_text, "tema": tema})
+        # [ANALÍTICA] Tema de la consulta (solo la categoría, nunca el texto)
+        try:
+            tema = tema_futuro.result(timeout=5)
+        except Exception:
+            tema = "Otro"
+        logger.info("consulta_respondida tema=%s", tema)
+
+        yield "data: " + json.dumps({"done": True, "tema": tema}) + "\n\n"
+
+    resp = Response(stream_with_context(generate()), mimetype="text/event-stream")
+    # Evita que algún proxy intermedio (p.ej. Cloudflare, que está delante de
+    # este sitio) almacene en búfer la respuesta esperando a que termine antes
+    # de entregarla — eso anularía el streaming y se vería igual que antes.
+    resp.headers["Cache-Control"] = "no-cache"
+    resp.headers["X-Accel-Buffering"] = "no"
+    return resp
 
 
 @app.errorhandler(429)
