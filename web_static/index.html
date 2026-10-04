@@ -587,32 +587,96 @@
         return;
       }
 
-      botEl.classList.remove("thinking");
-
-      var data = null;
-      try {
-        data = await res.json();
-      } catch (parseErr) {
-        // El servidor respondió, pero no con JSON válido (p.ej. una página
-        // de error del proveedor de hosting por una caída momentánea o por
-        // tardar demasiado) — distinto de "no hay conexión".
+      if (!res.ok || !res.body) {
         botEl.remove();
-        addMessage("error", "Nuestro servidor no respondió correctamente (código " + res.status + "). "
-          + "No es un problema de tu conexión — intenta de nuevo en un momento y, si persiste, avísanos.");
+        addMessage("error", "Nuestro servidor devolvió un error inesperado (código " + res.status + "). "
+          + "Intenta de nuevo; si se repite, avísanos para revisarlo.");
         scrollToBottom();
         return;
       }
 
-      if (!res.ok && !data.reply) {
-        botEl.remove();
-        addMessage("error", "Nuestro servidor devolvió un error inesperado (código " + res.status + "). "
-          + "Intenta de nuevo; si se repite, avísanos para revisarlo.");
-      } else {
-        botEl.innerHTML = renderMarkdownLite(data.reply);
-        addCopyButton(botEl, data.reply);
-        turns.push({ role: "assistant", content: data.reply });
+      // El backend responde con Server-Sent Events: el texto llega en trozos
+      // (eventos "delta") a medida que el modelo lo va generando, en vez de
+      // esperar la respuesta completa. Así el usuario ve el texto aparecer
+      // poco a poco en lugar de un "Pensando..." fijo durante varios segundos.
+      var reader = res.body.getReader();
+      var decoder = new TextDecoder();
+      var buffer = "";
+      var accumulated = "";
+      var erroDeBackend = null; // error ya traducido por el backend (ej. timeout) — se muestra como respuesta normal
+      var huboTexto = false;
+      var cortoSinTerminar = true;
+
+      try {
+        while (true) {
+          var chunk;
+          try {
+            chunk = await reader.read();
+          } catch (streamErr) {
+            break; // conexión cortada a mitad de la transmisión
+          }
+          if (chunk.done) { cortoSinTerminar = false; break; }
+
+          buffer += decoder.decode(chunk.value, { stream: true });
+          var partes = buffer.split("\n\n");
+          buffer = partes.pop(); // posible fragmento incompleto: se guarda para el próximo chunk
+
+          for (var i = 0; i < partes.length; i++) {
+            var linea = partes[i];
+            if (linea.indexOf("data: ") !== 0) continue;
+            var evt;
+            try { evt = JSON.parse(linea.slice(6)); } catch (parseErr) { continue; }
+
+            if (evt.error) {
+              erroDeBackend = evt.reply || null;
+            } else if (typeof evt.delta === "string") {
+              if (!huboTexto) {
+                huboTexto = true;
+                botEl.classList.remove("thinking");
+              }
+              accumulated += evt.delta;
+              botEl.innerHTML = renderMarkdownLite(accumulated);
+              scrollToBottom();
+            } else if (evt.done) {
+              cortoSinTerminar = false;
+            }
+          }
+        }
+      } finally {
+        try { reader.cancel(); } catch (e) {}
+      }
+
+      botEl.classList.remove("thinking");
+
+      if (erroDeBackend) {
+        // El backend ya tradujo el fallo (timeout/error de IA) a un mensaje
+        // claro — se trata igual que una respuesta normal del bot, como antes.
+        botEl.innerHTML = renderMarkdownLite(erroDeBackend);
+        addCopyButton(botEl, erroDeBackend);
+        turns.push({ role: "assistant", content: erroDeBackend });
         saveHistory();
         scrollToStart(botEl);
+      } else if (!accumulated) {
+        // La conexión se cortó antes de recibir ningún texto y sin que el
+        // backend llegara a avisar un error — no hay nada que mostrar como
+        // respuesta del bot.
+        botEl.remove();
+        addMessage("error", "Nuestro servidor no respondió correctamente. "
+          + "No es un problema de tu conexión — intenta de nuevo en un momento y, si persiste, avísanos.");
+        scrollToBottom();
+      } else {
+        addCopyButton(botEl, accumulated);
+        turns.push({ role: "assistant", content: accumulated });
+        saveHistory();
+        scrollToStart(botEl);
+        if (cortoSinTerminar) {
+          // Hubo texto pero la transmisión se cortó antes del evento final
+          // (ej. se perdió la conexión a mitad de camino) — se avisa aparte,
+          // sin descartar lo que ya se alcanzó a mostrar.
+          addMessage("error", "La respuesta se cortó antes de terminar — puede haber sido una conexión inestable. "
+            + "Si quedó incompleta, vuelve a preguntar.");
+          scrollToBottom();
+        }
       }
     } finally {
       clearTimeout(timeoutId);
