@@ -633,10 +633,16 @@
               if (!huboTexto) {
                 huboTexto = true;
                 botEl.classList.remove("thinking");
+                // Se ancla la vista al INICIO del mensaje una sola vez, apenas
+                // empieza a llegar texto, y se deja quieta ahí mientras el
+                // contenido crece debajo. Antes se hacía scrollToBottom() en
+                // cada fragmento, lo que empujaba la vista hacia abajo una y
+                // otra vez y no dejaba leer desde el principio hasta que
+                // terminaba de escribir — justo lo que reportó Hernán.
+                scrollToStart(botEl);
               }
               accumulated += evt.delta;
               botEl.innerHTML = renderMarkdownLite(accumulated);
-              scrollToBottom();
             } else if (evt.done) {
               cortoSinTerminar = false;
             }
