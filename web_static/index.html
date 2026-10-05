@@ -136,6 +136,13 @@
   .msg .att{display:block;font-size:.78rem;opacity:.8;margin-bottom:4px;}
   .copyBtn{display:block;margin-top:9px;border:none;background:none;color:var(--text-muted);font-size:.74rem;cursor:pointer;padding:0;text-decoration:underline;}
   .copyBtn:hover{color:var(--primary-dark);}
+  .verMasBtn{
+    display:inline-flex; align-items:center; gap:5px; margin-top:7px;
+    border:1px solid var(--border); background:var(--surface-alt); color:var(--primary-dark);
+    font-size:.78rem; font-weight:600; padding:7px 12px; border-radius:999px; cursor:pointer;
+  }
+  .verMasBtn:hover{border-color:var(--primary);}
+  .verMasBtn svg{width:11px;height:11px;transition:transform .15s ease;}
   @media (max-width:420px){ .msg{max-width:90%;} }
 
   /* Header: logo + título truncable + acciones (nueva conversación / cuenta
@@ -405,6 +412,27 @@
     return out.join("\n").replace(/\n{3,}/g, "\n\n").trim();
   }
 
+  // Si la respuesta es más larga de lo que se lee cómodamente de un vistazo,
+  // arma una vista previa cortada en un límite de frase/palabra (nunca a
+  // mitad de una palabra) para el botón "Ver respuesta completa". Devuelve
+  // null si no hace falta recortar (la respuesta ya es corta).
+  var PREVIEW_LIMIT = 620;
+  function buildPreview(text){
+    if (!text || text.length <= PREVIEW_LIMIT) return null;
+    var window_ = text.slice(0, PREVIEW_LIMIT);
+    var corte = -1;
+    var m = window_.match(/[.!?](?:["')\]]*)(?!.*[.!?])/); // última puntuación de cierre de frase en la ventana
+    if (m) corte = m.index + m[0].length;
+    if (corte < PREVIEW_LIMIT * 0.4) {
+      // La última frase quedó muy corta (o no había ninguna) — corta por palabra.
+      var ultimoEspacio = window_.lastIndexOf(" ");
+      corte = ultimoEspacio > 0 ? ultimoEspacio : PREVIEW_LIMIT;
+    }
+    var preview = text.slice(0, corte).trim();
+    if (!preview || preview.length >= text.length) return null;
+    return preview;
+  }
+
   function fallbackCopy(text, done){
     try {
       var ta = document.createElement("textarea");
@@ -440,6 +468,33 @@
     el.appendChild(btn);
   }
 
+  // Pinta el contenido final de un mensaje del bot. Si el texto es largo,
+  // muestra primero una vista previa corta con un botón "Ver respuesta
+  // completa" — al hacer clic se reemplaza por el texto íntegro (ya
+  // recibido, sin ninguna llamada nueva al servidor, así que no hay demora
+  // ni se pierde contenido). Si el texto ya es corto, se muestra completo
+  // de una vez, como antes.
+  function renderBotFinal(botEl, fullText){
+    var preview = buildPreview(fullText);
+    if (!preview) {
+      botEl.innerHTML = renderMarkdownLite(fullText);
+      addCopyButton(botEl, fullText);
+      return;
+    }
+    botEl.innerHTML = renderMarkdownLite(preview);
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "verMasBtn";
+    btn.innerHTML = "Ver respuesta completa "
+      + "<svg viewBox=\"0 0 12 12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"><path d=\"M2.5 4.5 6 8l3.5-3.5\"/></svg>";
+    btn.addEventListener("click", function(){
+      botEl.innerHTML = renderMarkdownLite(fullText);
+      addCopyButton(botEl, fullText);
+      scrollToStart(botEl);
+    });
+    botEl.appendChild(btn);
+  }
+
   function addMessage(role, text, attachmentName){
     var el = document.createElement("div");
     el.className = "msg " + role;
@@ -452,10 +507,16 @@
     var isBot = role.indexOf("bot") === 0;
     var isThinking = role.indexOf("thinking") !== -1;
     if (isBot) {
-      var content = document.createElement("span");
-      content.innerHTML = renderMarkdownLite(text);
-      el.appendChild(content);
-      if (!isThinking) addCopyButton(el, text);
+      if (isThinking) {
+        var content = document.createElement("span");
+        content.innerHTML = renderMarkdownLite(text);
+        el.appendChild(content);
+      } else {
+        // Mismo criterio de vista previa / "Ver respuesta completa" que al
+        // terminar un streaming en vivo, para que una conversación recargada
+        // desde el historial se vea igual (sin bloques larguísimos de una).
+        renderBotFinal(el, text);
+      }
     } else {
       el.appendChild(document.createTextNode(text));
     }
@@ -657,8 +718,7 @@
       if (erroDeBackend) {
         // El backend ya tradujo el fallo (timeout/error de IA) a un mensaje
         // claro — se trata igual que una respuesta normal del bot, como antes.
-        botEl.innerHTML = renderMarkdownLite(erroDeBackend);
-        addCopyButton(botEl, erroDeBackend);
+        renderBotFinal(botEl, erroDeBackend);
         turns.push({ role: "assistant", content: erroDeBackend });
         saveHistory();
         scrollToStart(botEl);
@@ -671,7 +731,7 @@
           + "No es un problema de tu conexión — intenta de nuevo en un momento y, si persiste, avísanos.");
         scrollToBottom();
       } else {
-        addCopyButton(botEl, accumulated);
+        renderBotFinal(botEl, accumulated);
         turns.push({ role: "assistant", content: accumulated });
         saveHistory();
         scrollToStart(botEl);
