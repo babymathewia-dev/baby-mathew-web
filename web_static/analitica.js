@@ -65,31 +65,47 @@ window.dataLayer = window.dataLayer || [];
         (async function () {
           var tema = null;
           var tipoError = null;
-          try {
-            var reader = resp.clone().body.getReader();
-            var decoder = new TextDecoder();
-            var buffer = '';
-            while (true) {
-              var chunk = await reader.read();
-              if (chunk.done) break;
-              buffer += decoder.decode(chunk.value, { stream: true });
-              var partes = buffer.split('\n\n');
-              buffer = partes.pop();
-              for (var i = 0; i < partes.length; i++) {
-                var linea = partes[i];
-                if (linea.indexOf('data: ') !== 0) continue;
-                var evt;
-                try { evt = JSON.parse(linea.slice(6)); } catch (e) { continue; }
-                if (evt.error) tipoError = String(evt.error);
-                if (evt.done) tema = evt.tema || 'Sin clasificar';
-              }
+          var terminado = false;   // llegó el evento final ("done" o "error")
+          function procesarEvento(bloque) {
+            // Un evento SSE puede traer varias líneas (p. ej. "event: x" + "data: {...}").
+            var lineas = bloque.split(/\r?\n/);
+            for (var j = 0; j < lineas.length; j++) {
+              var l = lineas[j];
+              if (l.indexOf('data:') !== 0) continue;
+              var evt;
+              try { evt = JSON.parse(l.slice(5).trim()); } catch (e) { continue; }
+              if (evt && evt.error) { tipoError = String(evt.error); terminado = true; }
+              if (evt && evt.done) { tema = evt.tema || null; terminado = true; }
             }
-          } catch (e) {
-            // conexión cortada a mitad del stream: se reporta como respuesta
-            // recibida sin tema (mejor eso que inventar un error que no ocurrió
-            // del lado del backend).
           }
+          try {
+            var tipo = (resp.headers.get('content-type') || '').toLowerCase();
+            if (tipo.indexOf('text/event-stream') === -1) {
+              // [ANALÍTICA] Respuestas que NO son streaming (JSON): validaciones
+              // tempranas del backend (archivo muy grande, tipo no soportado,
+              // límite de mensajes 429) o un backend aún sin streaming.
+              var data = await resp.clone().json();
+              if (data && data.error) tipoError = String(data.error);
+              else tema = (data && data.tema) || null;
+              terminado = true;
+            } else {
+              var reader = resp.clone().body.getReader();
+              var decoder = new TextDecoder();
+              var buffer = '';
+              while (true) {
+                var chunk = await reader.read();
+                if (chunk.done) break;
+                buffer += decoder.decode(chunk.value, { stream: true });
+                var partes = buffer.split(/\r?\n\r?\n/);
+                buffer = partes.pop();
+                for (var i = 0; i < partes.length; i++) procesarEvento(partes[i]);
+              }
+              buffer += decoder.decode();
+              if (buffer.trim()) procesarEvento(buffer);   // último evento sin línea en blanco final
+            }
+          } catch (e) {}
           var ms = Math.round(performance.now() - inicio);
+          if (!tipoError && !terminado) tipoError = 'stream_incompleto';   // se cortó antes del final
           if (tipoError) {
             gtag('event', 'respuesta_error', { latencia_ms: ms, codigo_http: resp.status, tipo_error: tipoError });
           } else {
