@@ -347,8 +347,12 @@
     } catch (e) { return []; }
   }
 
-  function clearHistory(){
+  async function clearHistory(){
     try { localStorage.removeItem(STORAGE_KEY); } catch (e) { /* no-op */ }
+    if (loggedIn) {
+      try { await fetch("/api/history", { method: "DELETE" }); }
+      catch (e) { /* si falla la llamada al servidor, al menos quedó limpio el navegador */ }
+    }
   }
 
   function escapeHtml(s){
