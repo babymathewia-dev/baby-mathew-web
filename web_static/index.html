@@ -416,7 +416,7 @@
   // arma una vista previa cortada en un límite de frase/palabra (nunca a
   // mitad de una palabra) para el botón "Ver respuesta completa". Devuelve
   // null si no hace falta recortar (la respuesta ya es corta).
-  var PREVIEW_LIMIT = 620;
+  var PREVIEW_LIMIT = 900;
   function buildPreview(text){
     if (!text || text.length <= PREVIEW_LIMIT) return null;
     var window_ = text.slice(0, PREVIEW_LIMIT);
