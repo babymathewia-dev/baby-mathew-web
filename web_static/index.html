@@ -495,6 +495,31 @@
     botEl.appendChild(btn);
   }
 
+  // Variante de renderBotFinal para usar A MITAD del streaming en vivo, apenas
+  // el texto acumulado cruza el límite — en vez de esperar a que termine de
+  // escribir y ahí sí recortar (eso es lo que hacía que el mensaje se
+  // "encogiera" justo cuando el usuario ya iba leyendo más abajo). getFullText
+  // es una función que siempre devuelve el texto acumulado MÁS RECIENTE (no
+  // una copia fija), así que si el usuario hace clic en "Ver respuesta
+  // completa" mientras el streaming sigue, igual obtiene todo lo que haya
+  // llegado hasta ese momento.
+  function mostrarPrevia(botEl, getFullText){
+    var preview = buildPreview(getFullText()) || getFullText();
+    botEl.innerHTML = renderMarkdownLite(preview);
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "verMasBtn";
+    btn.innerHTML = "Ver respuesta completa "
+      + "<svg viewBox=\"0 0 12 12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"><path d=\"M2.5 4.5 6 8l3.5-3.5\"/></svg>";
+    btn.addEventListener("click", function(){
+      var full = getFullText();
+      botEl.innerHTML = renderMarkdownLite(full);
+      addCopyButton(botEl, full);
+      scrollToStart(botEl);
+    });
+    botEl.appendChild(btn);
+  }
+
   function addMessage(role, text, attachmentName){
     var el = document.createElement("div");
     el.className = "msg " + role;
@@ -667,6 +692,7 @@
       var erroDeBackend = null; // error ya traducido por el backend (ej. timeout) — se muestra como respuesta normal
       var huboTexto = false;
       var cortoSinTerminar = true;
+      var modoPrevia = false; // true desde que el texto cruza PREVIEW_LIMIT y se muestra la vista previa + "Ver más"
 
       try {
         while (true) {
@@ -703,7 +729,18 @@
                 scrollToStart(botEl);
               }
               accumulated += evt.delta;
-              botEl.innerHTML = renderMarkdownLite(accumulated);
+              if (!modoPrevia) {
+                if (accumulated.length > PREVIEW_LIMIT) {
+                  // Se cruzó el límite de lectura cómoda A MITAD del streaming:
+                  // se congela la vista en la previa + botón ya mismo, en vez
+                  // de seguir creciendo y recortar de golpe al final (que es
+                  // lo que generaba el "encogimiento" a mitad de lectura).
+                  modoPrevia = true;
+                  mostrarPrevia(botEl, function(){ return accumulated; });
+                } else {
+                  botEl.innerHTML = renderMarkdownLite(accumulated);
+                }
+              }
             } else if (evt.done) {
               cortoSinTerminar = false;
             }
@@ -731,10 +768,18 @@
           + "No es un problema de tu conexión — intenta de nuevo en un momento y, si persiste, avísanos.");
         scrollToBottom();
       } else {
-        renderBotFinal(botEl, accumulated);
+        if (!modoPrevia) {
+          // Respuesta corta: nunca cruzó el límite durante el streaming, se
+          // muestra completa como siempre.
+          renderBotFinal(botEl, accumulated);
+          scrollToStart(botEl);
+        }
+        // Si modoPrevia ya es true, botEl ya quedó en su estado correcto desde
+        // mitad del streaming (previa + botón, o ya expandido si el usuario
+        // hizo clic) — no se vuelve a tocar su innerHTML ni se reancla el
+        // scroll, para no interrumpir al usuario a mitad de lectura.
         turns.push({ role: "assistant", content: accumulated });
         saveHistory();
-        scrollToStart(botEl);
         if (cortoSinTerminar) {
           // Hubo texto pero la transmisión se cortó antes del evento final
           // (ej. se perdió la conexión a mitad de camino) — se avisa aparte,
