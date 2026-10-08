@@ -405,6 +405,67 @@ def init_db():
             conn.execute(ddl)
         except sqlite3.OperationalError:
             pass  # la columna ya existe
+
+    # --- Perfil del bebé + Agenda de citas -------------------------------
+    # Un "bebé" es una entidad independiente del usuario que lo crea: varios
+    # cuidadores (mamá, papá, etc.) se vinculan a él vía bebe_cuidadores, así
+    # que la agenda y las notas son compartidas entre todos los vinculados,
+    # no privadas de quien las registró.
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS bebes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nombre TEXT,
+            etapa TEXT NOT NULL CHECK (etapa IN ('gestacion', 'nacido')),
+            semana_gestacion INTEGER,
+            fecha_parto_probable TEXT,
+            fecha_nacimiento TEXT,
+            sexo TEXT,
+            created_by INTEGER NOT NULL REFERENCES users(id),
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS bebe_cuidadores (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bebe_id INTEGER NOT NULL REFERENCES bebes(id),
+            user_id INTEGER NOT NULL REFERENCES users(id),
+            rol TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (bebe_id, user_id)
+        )"""
+    )
+    # Código de invitación de un solo uso para vincular a otro cuidador
+    # (ej. el otro padre/madre) al mismo bebé, sin exponer el bebe_id directo.
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS bebe_invitaciones (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bebe_id INTEGER NOT NULL REFERENCES bebes(id),
+            codigo TEXT UNIQUE NOT NULL,
+            created_by INTEGER NOT NULL REFERENCES users(id),
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            used_by INTEGER REFERENCES users(id),
+            used_at TEXT
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS citas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bebe_id INTEGER NOT NULL REFERENCES bebes(id),
+            especialidad TEXT NOT NULL,
+            fecha TEXT NOT NULL,
+            hora TEXT,
+            lugar TEXT,
+            medico TEXT,
+            valor TEXT,
+            avisarme INTEGER NOT NULL DEFAULT 0,
+            notas TEXT,
+            estado TEXT NOT NULL DEFAULT 'pendiente' CHECK (estado IN ('pendiente', 'realizada', 'cancelada')),
+            created_by INTEGER NOT NULL REFERENCES users(id),
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )"""
+    )
     conn.commit()
     conn.close()
 
@@ -558,6 +619,268 @@ def api_feedback():
         "INSERT INTO feedback (user_id, question, answer, rating) VALUES (?, ?, ?, ?)",
         (session.get("user_id"), question[:MAX_MESSAGE_CHARS], answer[:4000], rating),
     )
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+def _mi_bebe_id(conn, user_id):
+    """bebe_id vinculado al usuario, o None si todavía no tiene perfil creado
+    ni se ha vinculado al de otro cuidador. Por ahora se asume 1 bebé por
+    usuario (el modelo de datos soporta más, pero la UI actual solo maneja uno)."""
+    row = conn.execute(
+        "SELECT bebe_id FROM bebe_cuidadores WHERE user_id = ? ORDER BY id ASC LIMIT 1",
+        (user_id,),
+    ).fetchone()
+    return row["bebe_id"] if row else None
+
+
+def _generar_codigo_invitacion():
+    import secrets
+    import string
+    alfabeto = string.ascii_uppercase + string.digits
+    return "".join(secrets.choice(alfabeto) for _ in range(6))
+
+
+@app.route("/api/bebe", methods=["GET"])
+def api_bebe_get():
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    conn = get_db()
+    bebe_id = _mi_bebe_id(conn, session["user_id"])
+    if not bebe_id:
+        conn.close()
+        return jsonify({"bebe": None})
+    bebe = conn.execute("SELECT * FROM bebes WHERE id = ?", (bebe_id,)).fetchone()
+    cuidadores = conn.execute(
+        """SELECT u.id, u.name, u.picture, bc.rol
+           FROM bebe_cuidadores bc JOIN users u ON u.id = bc.user_id
+           WHERE bc.bebe_id = ? ORDER BY bc.id ASC""",
+        (bebe_id,),
+    ).fetchall()
+    conn.close()
+    return jsonify({
+        "bebe": dict(bebe),
+        "cuidadores": [dict(c) for c in cuidadores],
+    })
+
+
+@app.route("/api/bebe", methods=["POST"])
+def api_bebe_save():
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    data = request.get_json(silent=True) or {}
+    etapa = data.get("etapa")
+    if etapa not in ("gestacion", "nacido"):
+        return jsonify({"error": "invalid_request"}), 400
+
+    campos = {
+        "nombre": (data.get("nombre") or "").strip()[:80] or None,
+        "etapa": etapa,
+        "semana_gestacion": data.get("semana_gestacion") if etapa == "gestacion" else None,
+        "fecha_parto_probable": (data.get("fecha_parto_probable") or None) if etapa == "gestacion" else None,
+        "fecha_nacimiento": (data.get("fecha_nacimiento") or None) if etapa == "nacido" else None,
+        "sexo": (data.get("sexo") or "").strip()[:40] or None,
+    }
+    rol = (data.get("rol") or "").strip()[:40] or None
+
+    conn = get_db()
+    user_id = session["user_id"]
+    bebe_id = _mi_bebe_id(conn, user_id)
+    if bebe_id:
+        conn.execute(
+            """UPDATE bebes SET nombre=?, etapa=?, semana_gestacion=?, fecha_parto_probable=?,
+               fecha_nacimiento=?, sexo=?, updated_at=CURRENT_TIMESTAMP WHERE id=?""",
+            (*campos.values(), bebe_id),
+        )
+        if rol:
+            conn.execute(
+                "UPDATE bebe_cuidadores SET rol=? WHERE bebe_id=? AND user_id=?",
+                (rol, bebe_id, user_id),
+            )
+    else:
+        cur = conn.execute(
+            """INSERT INTO bebes (nombre, etapa, semana_gestacion, fecha_parto_probable,
+               fecha_nacimiento, sexo, created_by) VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (*campos.values(), user_id),
+        )
+        bebe_id = cur.lastrowid
+        conn.execute(
+            "INSERT INTO bebe_cuidadores (bebe_id, user_id, rol) VALUES (?, ?, ?)",
+            (bebe_id, user_id, rol or "Cuidador"),
+        )
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "bebe_id": bebe_id})
+
+
+@app.route("/api/bebe/invitar", methods=["POST"])
+@limiter.limit("10 per hour")
+def api_bebe_invitar():
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    conn = get_db()
+    bebe_id = _mi_bebe_id(conn, session["user_id"])
+    if not bebe_id:
+        conn.close()
+        return jsonify({"error": "sin_perfil"}), 400
+    codigo = _generar_codigo_invitacion()
+    conn.execute(
+        "INSERT INTO bebe_invitaciones (bebe_id, codigo, created_by) VALUES (?, ?, ?)",
+        (bebe_id, codigo, session["user_id"]),
+    )
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True, "codigo": codigo})
+
+
+@app.route("/api/bebe/vincular", methods=["POST"])
+@limiter.limit("10 per hour")
+def api_bebe_vincular():
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    data = request.get_json(silent=True) or {}
+    codigo = (data.get("codigo") or "").strip().upper()
+    rol = (data.get("rol") or "").strip()[:40] or "Cuidador"
+    if not codigo:
+        return jsonify({"error": "invalid_request"}), 400
+
+    conn = get_db()
+    user_id = session["user_id"]
+    if _mi_bebe_id(conn, user_id):
+        conn.close()
+        return jsonify({"error": "ya_tiene_perfil"}), 400
+
+    inv = conn.execute(
+        "SELECT * FROM bebe_invitaciones WHERE codigo = ? AND used_by IS NULL",
+        (codigo,),
+    ).fetchone()
+    if not inv:
+        conn.close()
+        return jsonify({"error": "codigo_invalido"}), 404
+
+    try:
+        conn.execute(
+            "INSERT INTO bebe_cuidadores (bebe_id, user_id, rol) VALUES (?, ?, ?)",
+            (inv["bebe_id"], user_id, rol),
+        )
+        conn.execute(
+            "UPDATE bebe_invitaciones SET used_by=?, used_at=CURRENT_TIMESTAMP WHERE id=?",
+            (user_id, inv["id"]),
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        return jsonify({"error": "ya_vinculado"}), 400
+    conn.close()
+    return jsonify({"ok": True, "bebe_id": inv["bebe_id"]})
+
+
+@app.route("/api/citas", methods=["GET"])
+def api_citas_list():
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    conn = get_db()
+    bebe_id = _mi_bebe_id(conn, session["user_id"])
+    if not bebe_id:
+        conn.close()
+        return jsonify({"error": "sin_perfil"}), 400
+    rows = conn.execute(
+        """SELECT c.*, u.name AS creado_por_nombre
+           FROM citas c JOIN users u ON u.id = c.created_by
+           WHERE c.bebe_id = ? ORDER BY c.fecha ASC, c.hora ASC""",
+        (bebe_id,),
+    ).fetchall()
+    conn.close()
+    return jsonify({"citas": [dict(r) for r in rows]})
+
+
+@app.route("/api/citas", methods=["POST"])
+@limiter.limit("30 per hour")
+def api_citas_create():
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    conn = get_db()
+    user_id = session["user_id"]
+    bebe_id = _mi_bebe_id(conn, user_id)
+    if not bebe_id:
+        conn.close()
+        return jsonify({"error": "sin_perfil"}), 400
+
+    data = request.get_json(silent=True) or {}
+    especialidad = (data.get("especialidad") or "").strip()[:80]
+    fecha = (data.get("fecha") or "").strip()[:10]
+    if not especialidad or not fecha:
+        conn.close()
+        return jsonify({"error": "invalid_request"}), 400
+
+    cur = conn.execute(
+        """INSERT INTO citas (bebe_id, especialidad, fecha, hora, lugar, medico, valor,
+           avisarme, notas, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            bebe_id, especialidad, fecha,
+            (data.get("hora") or "").strip()[:5] or None,
+            (data.get("lugar") or "").strip()[:120] or None,
+            (data.get("medico") or "").strip()[:120] or None,
+            (data.get("valor") or "").strip()[:40] or None,
+            1 if data.get("avisarme") else 0,
+            (data.get("notas") or "").strip()[:2000] or None,
+            user_id,
+        ),
+    )
+    conn.commit()
+    cita_id = cur.lastrowid
+    conn.close()
+    return jsonify({"ok": True, "id": cita_id})
+
+
+@app.route("/api/citas/<int:cita_id>", methods=["PUT"])
+def api_citas_update(cita_id):
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    conn = get_db()
+    bebe_id = _mi_bebe_id(conn, session["user_id"])
+    if not bebe_id:
+        conn.close()
+        return jsonify({"error": "sin_perfil"}), 400
+    cita = conn.execute("SELECT id FROM citas WHERE id = ? AND bebe_id = ?", (cita_id, bebe_id)).fetchone()
+    if not cita:
+        conn.close()
+        return jsonify({"error": "not_found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    campos = []
+    valores = []
+    if "notas" in data:
+        campos.append("notas = ?")
+        valores.append((data.get("notas") or "").strip()[:2000] or None)
+    if "estado" in data and data.get("estado") in ("pendiente", "realizada", "cancelada"):
+        campos.append("estado = ?")
+        valores.append(data.get("estado"))
+    if "avisarme" in data:
+        campos.append("avisarme = ?")
+        valores.append(1 if data.get("avisarme") else 0)
+    if not campos:
+        conn.close()
+        return jsonify({"error": "invalid_request"}), 400
+    campos.append("updated_at = CURRENT_TIMESTAMP")
+    valores.append(cita_id)
+    conn.execute(f"UPDATE citas SET {', '.join(campos)} WHERE id = ?", valores)
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/citas/<int:cita_id>", methods=["DELETE"])
+def api_citas_delete(cita_id):
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    conn = get_db()
+    bebe_id = _mi_bebe_id(conn, session["user_id"])
+    if not bebe_id:
+        conn.close()
+        return jsonify({"error": "sin_perfil"}), 400
+    conn.execute("DELETE FROM citas WHERE id = ? AND bebe_id = ?", (cita_id, bebe_id))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
