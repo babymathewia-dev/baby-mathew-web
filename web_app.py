@@ -466,6 +466,27 @@ def init_db():
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         )"""
     )
+    # Medicamentos: SOLO lo que el cuidador registra tal cual se lo indicó el
+    # pediatra (nombre, cantidad, hora, frecuencia). El sistema nunca sugiere
+    # ni calcula dosis — es un recordatorio de lo ya prescrito, mismo
+    # principio que el disclaimer legal del chat.
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS medicamentos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bebe_id INTEGER NOT NULL REFERENCES bebes(id),
+            nombre TEXT NOT NULL,
+            cantidad TEXT,
+            hora TEXT,
+            frecuencia TEXT,
+            fecha_inicio TEXT,
+            fecha_fin TEXT,
+            notas TEXT,
+            activo INTEGER NOT NULL DEFAULT 1,
+            created_by INTEGER NOT NULL REFERENCES users(id),
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            updated_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )"""
+    )
     conn.commit()
     conn.close()
 
@@ -881,6 +902,114 @@ def api_citas_delete(cita_id):
         conn.close()
         return jsonify({"error": "sin_perfil"}), 400
     conn.execute("DELETE FROM citas WHERE id = ? AND bebe_id = ?", (cita_id, bebe_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/medicamentos", methods=["GET"])
+def api_medicamentos_list():
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    conn = get_db()
+    bebe_id = _mi_bebe_id(conn, session["user_id"])
+    if not bebe_id:
+        conn.close()
+        return jsonify({"error": "sin_perfil"}), 400
+    rows = conn.execute(
+        """SELECT m.*, u.name AS creado_por_nombre
+           FROM medicamentos m JOIN users u ON u.id = m.created_by
+           WHERE m.bebe_id = ? ORDER BY m.activo DESC, m.hora ASC""",
+        (bebe_id,),
+    ).fetchall()
+    conn.close()
+    return jsonify({"medicamentos": [dict(r) for r in rows]})
+
+
+@app.route("/api/medicamentos", methods=["POST"])
+@limiter.limit("30 per hour")
+def api_medicamentos_create():
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    conn = get_db()
+    user_id = session["user_id"]
+    bebe_id = _mi_bebe_id(conn, user_id)
+    if not bebe_id:
+        conn.close()
+        return jsonify({"error": "sin_perfil"}), 400
+
+    data = request.get_json(silent=True) or {}
+    nombre = (data.get("nombre") or "").strip()[:120]
+    if not nombre:
+        conn.close()
+        return jsonify({"error": "invalid_request"}), 400
+
+    cur = conn.execute(
+        """INSERT INTO medicamentos (bebe_id, nombre, cantidad, hora, frecuencia,
+           fecha_inicio, fecha_fin, notas, created_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            bebe_id, nombre,
+            (data.get("cantidad") or "").strip()[:60] or None,
+            (data.get("hora") or "").strip()[:5] or None,
+            (data.get("frecuencia") or "").strip()[:60] or None,
+            (data.get("fecha_inicio") or "").strip()[:10] or None,
+            (data.get("fecha_fin") or "").strip()[:10] or None,
+            (data.get("notas") or "").strip()[:500] or None,
+            user_id,
+        ),
+    )
+    conn.commit()
+    medicamento_id = cur.lastrowid
+    conn.close()
+    return jsonify({"ok": True, "id": medicamento_id})
+
+
+@app.route("/api/medicamentos/<int:medicamento_id>", methods=["PUT"])
+def api_medicamentos_update(medicamento_id):
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    conn = get_db()
+    bebe_id = _mi_bebe_id(conn, session["user_id"])
+    if not bebe_id:
+        conn.close()
+        return jsonify({"error": "sin_perfil"}), 400
+    med = conn.execute(
+        "SELECT id FROM medicamentos WHERE id = ? AND bebe_id = ?", (medicamento_id, bebe_id)
+    ).fetchone()
+    if not med:
+        conn.close()
+        return jsonify({"error": "not_found"}), 404
+
+    data = request.get_json(silent=True) or {}
+    campos = []
+    valores = []
+    if "activo" in data:
+        campos.append("activo = ?")
+        valores.append(1 if data.get("activo") else 0)
+    if "notas" in data:
+        campos.append("notas = ?")
+        valores.append((data.get("notas") or "").strip()[:500] or None)
+    if not campos:
+        conn.close()
+        return jsonify({"error": "invalid_request"}), 400
+    campos.append("updated_at = CURRENT_TIMESTAMP")
+    valores.append(medicamento_id)
+    conn.execute(f"UPDATE medicamentos SET {', '.join(campos)} WHERE id = ?", valores)
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/medicamentos/<int:medicamento_id>", methods=["DELETE"])
+def api_medicamentos_delete(medicamento_id):
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    conn = get_db()
+    bebe_id = _mi_bebe_id(conn, session["user_id"])
+    if not bebe_id:
+        conn.close()
+        return jsonify({"error": "sin_perfil"}), 400
+    conn.execute("DELETE FROM medicamentos WHERE id = ? AND bebe_id = ?", (medicamento_id, bebe_id))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
