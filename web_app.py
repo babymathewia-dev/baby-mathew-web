@@ -379,6 +379,20 @@ def init_db():
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )"""
     )
+    # Feedback (👍/👎) por respuesta del bot. user_id es NULL para usuarios
+    # anónimos (sin login) -- igual queremos su feedback, solo no podemos
+    # atribuírselo a una cuenta. question/answer van completos para poder
+    # revisar el caso real más adelante, no solo el conteo de votos.
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS feedback (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER REFERENCES users(id),
+            question TEXT NOT NULL,
+            answer TEXT NOT NULL,
+            rating TEXT NOT NULL CHECK (rating IN ('up', 'down')),
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )"""
+    )
     # Migración para bases ya desplegadas antes de que existieran estas dos
     # columnas: CREATE TABLE IF NOT EXISTS no las agrega a una tabla que ya
     # existe, así que se intentan añadir por separado (falla en silencio si
@@ -522,6 +536,28 @@ def api_history_clear():
         return jsonify({"error": "not_logged_in"}), 401
     conn = get_db()
     conn.execute("DELETE FROM messages WHERE user_id = ?", (session["user_id"],))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+@app.route("/api/feedback", methods=["POST"])
+@limiter.limit("30 per minute")
+def api_feedback():
+    data = request.get_json(silent=True) or {}
+    rating = data.get("rating")
+    question = data.get("question")
+    answer = data.get("answer")
+    if rating not in ("up", "down") or not isinstance(answer, str) or not answer.strip():
+        return jsonify({"error": "invalid_request"}), 400
+    if not isinstance(question, str):
+        question = ""
+
+    conn = get_db()
+    conn.execute(
+        "INSERT INTO feedback (user_id, question, answer, rating) VALUES (?, ?, ?, ?)",
+        (session.get("user_id"), question[:MAX_MESSAGE_CHARS], answer[:4000], rating),
+    )
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
