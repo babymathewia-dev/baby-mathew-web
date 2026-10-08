@@ -143,6 +143,14 @@
   }
   .verMasBtn:hover{border-color:var(--primary);}
   .verMasBtn svg{width:11px;height:11px;transition:transform .15s ease;}
+  .feedbackBtns{display:flex;align-items:center;gap:6px;margin-top:9px;}
+  .fbBtn{
+    border:1px solid var(--border); background:none; color:var(--text-muted);
+    font-size:.88rem; line-height:1; padding:5px 9px; border-radius:999px; cursor:pointer;
+  }
+  .fbBtn:hover:not(:disabled){border-color:var(--primary);}
+  .fbBtn:disabled{cursor:default;}
+  .fbBtn.fbSelected{border-color:var(--primary);background:var(--surface-alt);}
   @media (max-width:420px){ .msg{max-width:90%;} }
 
   /* Header: logo + título truncable + acciones (nueva conversación / cuenta
@@ -472,6 +480,42 @@
     el.appendChild(btn);
   }
 
+  // Botones de 👍/👎 bajo una respuesta del bot, para medir qué respuestas
+  // sirven de verdad (más allá de lo que detectamos probando manualmente).
+  // Envía la pregunta + la respuesta completa; best-effort (si falla el envío
+  // no interrumpe nada, simplemente no queda registrado ese voto).
+  function addFeedbackButtons(el, questionText, answerText){
+    if (!answerText) return;
+    var wrap = document.createElement("div");
+    wrap.className = "feedbackBtns";
+    var up = document.createElement("button");
+    up.type = "button";
+    up.className = "fbBtn fbUp";
+    up.setAttribute("aria-label", "Esta respuesta me sirvió");
+    up.textContent = "👍";
+    var down = document.createElement("button");
+    down.type = "button";
+    down.className = "fbBtn fbDown";
+    down.setAttribute("aria-label", "Esta respuesta no me sirvió");
+    down.textContent = "👎";
+
+    function enviar(rating, btnClicked){
+      up.disabled = true;
+      down.disabled = true;
+      btnClicked.classList.add("fbSelected");
+      fetch("/api/feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ question: questionText || "", answer: answerText, rating: rating })
+      }).catch(function(){ /* best-effort: no bloquea la experiencia si falla */ });
+    }
+    up.addEventListener("click", function(){ enviar("up", up); });
+    down.addEventListener("click", function(){ enviar("down", down); });
+    wrap.appendChild(up);
+    wrap.appendChild(down);
+    el.appendChild(wrap);
+  }
+
   // Pinta el contenido final de un mensaje del bot. Si el texto es largo,
   // muestra primero una vista previa corta con un botón "Ver respuesta
   // completa" — al hacer clic se reemplaza por el texto íntegro (ya
@@ -524,7 +568,7 @@
     botEl.appendChild(btn);
   }
 
-  function addMessage(role, text, attachmentName){
+  function addMessage(role, text, attachmentName, precedingQuestion){
     var el = document.createElement("div");
     el.className = "msg " + role;
     if (attachmentName) {
@@ -545,6 +589,11 @@
         // terminar un streaming en vivo, para que una conversación recargada
         // desde el historial se vea igual (sin bloques larguísimos de una).
         renderBotFinal(el, text);
+        // precedingQuestion solo viene informado al reconstruir desde el
+        // historial (ver renderTurns) — así también se puede dar feedback a
+        // una respuesta de una conversación anterior, no solo a la recién
+        // generada (esa ya lo recibe directo en ask()).
+        if (precedingQuestion !== undefined) addFeedbackButtons(el, precedingQuestion, text);
       }
     } else {
       el.appendChild(document.createTextNode(text));
@@ -782,6 +831,9 @@
         // mitad del streaming (previa + botón, o ya expandido si el usuario
         // hizo clic) — no se vuelve a tocar su innerHTML ni se reancla el
         // scroll, para no interrumpir al usuario a mitad de lectura.
+        // Los botones de feedback se agregan aparte (appendChild, no toca el
+        // innerHTML ya pintado) y funcionan igual en los dos casos.
+        addFeedbackButtons(botEl, displayText, accumulated);
         turns.push({ role: "assistant", content: accumulated });
         saveHistory();
         if (cortoSinTerminar) {
@@ -873,10 +925,16 @@
   function renderTurns(saved){
     if (!saved || !saved.length) return;
     hideStage();
+    var lastUserText = "";
     for (var i = 0; i < saved.length; i++) {
       var t = saved[i];
       if (t && (t.role === "user" || t.role === "assistant") && typeof t.content === "string") {
-        addMessage(t.role === "user" ? "user" : "bot", t.content);
+        if (t.role === "user") {
+          addMessage("user", t.content);
+          lastUserText = t.content;
+        } else {
+          addMessage("bot", t.content, null, lastUserText);
+        }
       }
     }
     turns = saved;
