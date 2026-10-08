@@ -306,7 +306,7 @@
   <div id="agendaOverlay" class="modalOverlay hidden">
     <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="agendaModalTitle">
       <div class="modalHeader">
-        <h2 id="agendaModalTitle">Agenda de citas</h2>
+        <h2 id="agendaModalTitle">Agenda</h2>
         <button type="button" class="modalCloseBtn" id="agendaCloseBtn" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></button>
       </div>
       <div class="modalBody" id="agendaModalBody"></div>
@@ -374,7 +374,7 @@
       </button>
       <button type="button" class="more-menu-item" id="menuAgenda" role="menuitem">
         <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
-        Agenda de citas
+        Agenda
       </button>
       <a href="https://www.tiktok.com/@baby.mathew.ia" target="_blank" rel="noopener" class="more-menu-item" id="menuTikTok" role="menuitem">
         <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.6 5.82c-.84-.73-1.38-1.77-1.5-2.93h-3.03v13.44a3.03 3.03 0 1 1-2.14-2.9V10.3a6.1 6.1 0 1 0 5.17 6.03V9.57a8.13 8.13 0 0 0 4.75 1.53V8.07c-1.19 0-2.3-.4-3.25-1.08l0 0z"/></svg></span>
@@ -1403,7 +1403,10 @@
   bebeCloseBtn.addEventListener("click", function(){ bebeOverlay.classList.add("hidden"); });
   bebeOverlay.addEventListener("click", function(ev){ if (ev.target === bebeOverlay) bebeOverlay.classList.add("hidden"); });
 
-  // ---- Agenda de citas ---------------------------------------------------
+  // ---- Agenda (Citas + Medicamentos, en pestañas) ------------------------
+  var agendaTab = "citas";
+  var agendaContentEl = null;
+
   function openAgendaModal(){
     agendaOverlay.classList.remove("hidden");
     limpiarFab();
@@ -1415,7 +1418,7 @@
         var p = document.createElement("p");
         p.style.fontSize = ".86rem";
         p.style.color = "var(--text-muted)";
-        p.textContent = "Primero crea el perfil del bebé para poder agendar sus citas.";
+        p.textContent = "Primero crea el perfil del bebé para poder agendar citas y medicamentos.";
         var btn = document.createElement("button");
         btn.type = "button";
         btn.className = "btnPrimary";
@@ -1426,29 +1429,62 @@
         agendaModalBody.appendChild(btn);
         return;
       }
-      cargarCitas();
+      agendaTab = "citas";
+      renderAgendaShell();
     }).catch(function(){
       agendaModalBody.innerHTML = "<p style=\"color:var(--danger-text);font-size:.86rem;\">No se pudo cargar la agenda. Intenta de nuevo.</p>";
     });
   }
 
+  function renderAgendaShell(){
+    limpiarFab();
+    agendaModalBody.style.paddingBottom = "20px";
+    agendaModalBody.innerHTML = "";
+
+    var tabs = document.createElement("div");
+    tabs.className = "stageToggle";
+    var btnCitas = document.createElement("button");
+    btnCitas.type = "button";
+    btnCitas.textContent = "Citas";
+    var btnMeds = document.createElement("button");
+    btnMeds.type = "button";
+    btnMeds.textContent = "Medicamentos";
+    tabs.appendChild(btnCitas);
+    tabs.appendChild(btnMeds);
+    agendaModalBody.appendChild(tabs);
+
+    var content = document.createElement("div");
+    agendaModalBody.appendChild(content);
+    agendaContentEl = content;
+
+    function pintarTabs(){
+      btnCitas.className = agendaTab === "citas" ? "active" : "";
+      btnMeds.className = agendaTab === "medicamentos" ? "active" : "";
+    }
+    btnCitas.addEventListener("click", function(){ agendaTab = "citas"; pintarTabs(); cargarCitas(); });
+    btnMeds.addEventListener("click", function(){ agendaTab = "medicamentos"; pintarTabs(); cargarMedicamentos(); });
+    pintarTabs();
+
+    if (agendaTab === "citas") cargarCitas(); else cargarMedicamentos();
+  }
+
   function cargarCitas(){
-    agendaModalBody.innerHTML = "<p style=\"color:var(--text-muted);font-size:.86rem;\">Cargando…</p>";
+    limpiarFab();
+    agendaContentEl.innerHTML = "<p style=\"color:var(--text-muted);font-size:.86rem;\">Cargando…</p>";
     fetch("/api/citas").then(function(r){ return r.json(); }).then(function(data){
       renderAgendaLista(data.citas || []);
     }).catch(function(){
-      agendaModalBody.innerHTML = "<p style=\"color:var(--danger-text);font-size:.86rem;\">No se pudo cargar la agenda. Intenta de nuevo.</p>";
+      agendaContentEl.innerHTML = "<p style=\"color:var(--danger-text);font-size:.86rem;\">No se pudo cargar las citas. Intenta de nuevo.</p>";
     });
   }
 
   function renderAgendaLista(citas){
-    agendaModalBody.innerHTML = "";
-    agendaModalBody.style.paddingBottom = "80px";
+    agendaContentEl.innerHTML = "";
     if (!citas.length) {
       var empty = document.createElement("div");
       empty.className = "emptyState";
       empty.textContent = "Todavía no hay citas agendadas.";
-      agendaModalBody.appendChild(empty);
+      agendaContentEl.appendChild(empty);
     } else {
       var hoy = new Date().toISOString().slice(0, 10);
       citas.forEach(function(c){
@@ -1521,7 +1557,7 @@
         actions.appendChild(delBtn);
 
         card.appendChild(actions);
-        agendaModalBody.appendChild(card);
+        agendaContentEl.appendChild(card);
       });
     }
 
@@ -1532,7 +1568,6 @@
     fab.innerHTML = "<svg viewBox=\"0 0 22 22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M11 4v14M4 11h14\"/></svg>";
     fab.addEventListener("click", renderAgendaForm);
     agendaModalBody.parentNode.appendChild(fab);
-    agendaModalBody._fab = fab;
   }
 
   function limpiarFab(){
@@ -1543,17 +1578,16 @@
 
   function renderAgendaForm(){
     limpiarFab();
-    agendaModalBody.innerHTML = "";
-    agendaModalBody.style.paddingBottom = "20px";
+    agendaContentEl.innerHTML = "";
 
     var h3 = document.createElement("p");
     h3.style.margin = "0 0 14px";
     h3.style.fontWeight = "700";
     h3.style.color = "var(--text)";
     h3.textContent = "Nueva cita";
-    agendaModalBody.appendChild(h3);
+    agendaContentEl.appendChild(h3);
 
-    agendaModalBody.innerHTML += ""
+    agendaContentEl.innerHTML += ""
       + "<div class=\"fld\"><label for=\"cEspecialidad\">Especialidad</label>"
       + "<select id=\"cEspecialidad\"><option>Pediatría (control)</option><option>Vacunas</option><option>Estimulación</option><option>Nutrición</option><option>Otra</option></select></div>"
       + "<div class=\"fldRow\">"
@@ -1577,10 +1611,10 @@
       toggleBtn.classList.toggle("on", avisarme);
     });
     toggleRow.appendChild(toggleBtn);
-    agendaModalBody.appendChild(toggleRow);
+    agendaContentEl.appendChild(toggleRow);
 
-    agendaModalBody.innerHTML += "<div class=\"fld\"><label for=\"cNotas\">Notas (opcional)</label>"
-      + "<textarea id=\"cNotas\" rows=\"3\" placeholder=\"Recomendaciones, medicamentos...\"></textarea></div>";
+    agendaContentEl.innerHTML += "<div class=\"fld\"><label for=\"cNotas\">Notas (opcional)</label>"
+      + "<textarea id=\"cNotas\" rows=\"3\" placeholder=\"Recomendaciones, medicamentos formulados...\"></textarea></div>";
 
     var btnRow = document.createElement("div");
     btnRow.className = "btnRow";
@@ -1618,7 +1652,154 @@
     });
     btnRow.appendChild(cancelBtn);
     btnRow.appendChild(saveBtn);
-    agendaModalBody.appendChild(btnRow);
+    agendaContentEl.appendChild(btnRow);
+  }
+
+  // ---- Medicamentos (segunda pestaña de Agenda) --------------------------
+  // SOLO lo que el cuidador registró según lo indicado por el pediatra — el
+  // sistema nunca sugiere ni calcula dosis, mismo principio que el chat.
+  function cargarMedicamentos(){
+    limpiarFab();
+    agendaContentEl.innerHTML = "<p style=\"color:var(--text-muted);font-size:.86rem;\">Cargando…</p>";
+    fetch("/api/medicamentos").then(function(r){ return r.json(); }).then(function(data){
+      renderMedicamentosLista(data.medicamentos || []);
+    }).catch(function(){
+      agendaContentEl.innerHTML = "<p style=\"color:var(--danger-text);font-size:.86rem;\">No se pudo cargar los medicamentos. Intenta de nuevo.</p>";
+    });
+  }
+
+  function renderMedicamentosLista(meds){
+    agendaContentEl.innerHTML = "";
+    if (!meds.length) {
+      var empty = document.createElement("div");
+      empty.className = "emptyState";
+      empty.textContent = "Todavía no hay medicamentos registrados.";
+      agendaContentEl.appendChild(empty);
+    } else {
+      meds.forEach(function(m){
+        var card = document.createElement("div");
+        card.className = "citaCard" + (m.activo ? "" : " pasada");
+        var pill = "<span class=\"pillTag\">" + (m.activo ? "Activo" : "Inactivo") + "</span>";
+        var horaFrec = [m.hora, m.frecuencia].filter(Boolean).join(" · ");
+        var vigencia = [
+          m.fecha_inicio ? "Desde " + fmtFecha(m.fecha_inicio) : null,
+          m.fecha_fin ? "hasta " + fmtFecha(m.fecha_fin) : null,
+        ].filter(Boolean).join(" ");
+
+        card.innerHTML =
+          "<div class=\"meta\">" + pill + "</div>"
+          + "<p class=\"fecha\">" + escapeHtml(m.nombre) + (m.cantidad ? " · " + escapeHtml(m.cantidad) : "") + "</p>"
+          + (horaFrec ? "<p class=\"lugar\">" + escapeHtml(horaFrec) + "</p>" : "")
+          + (vigencia ? "<p class=\"lugar\">" + escapeHtml(vigencia) + "</p>" : "")
+          + (m.notas ? "<p class=\"lugar\">" + escapeHtml(m.notas) + "</p>" : "")
+          + "<div class=\"meta\"><div class=\"datos\"></div>"
+          + "<span class=\"quienAgrego\"><span class=\"avatarDot\" style=\"background:" + avatarColorFor(m.creado_por_nombre) + "\">" + inicialesDe(m.creado_por_nombre) + "</span>" + escapeHtml(m.creado_por_nombre || "") + "</span></div>";
+
+        var actions = document.createElement("div");
+        actions.className = "citaActions";
+        var toggleBtn = document.createElement("button");
+        toggleBtn.type = "button";
+        toggleBtn.textContent = m.activo ? "Marcar inactivo" : "Reactivar";
+        toggleBtn.addEventListener("click", function(){
+          fetch("/api/medicamentos/" + m.id, {
+            method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ activo: !m.activo })
+          }).then(function(){ cargarMedicamentos(); });
+        });
+        actions.appendChild(toggleBtn);
+
+        var delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.className = "danger";
+        delBtn.textContent = "Eliminar";
+        delBtn.addEventListener("click", function(){
+          if (!confirm("¿Eliminar este medicamento?")) return;
+          fetch("/api/medicamentos/" + m.id, { method: "DELETE" }).then(function(){ cargarMedicamentos(); });
+        });
+        actions.appendChild(delBtn);
+
+        card.appendChild(actions);
+        agendaContentEl.appendChild(card);
+      });
+    }
+
+    var fab = document.createElement("button");
+    fab.type = "button";
+    fab.className = "fabBtn";
+    fab.setAttribute("aria-label", "Agregar medicamento");
+    fab.innerHTML = "<svg viewBox=\"0 0 22 22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M11 4v14M4 11h14\"/></svg>";
+    fab.addEventListener("click", renderMedicamentoForm);
+    agendaModalBody.parentNode.appendChild(fab);
+  }
+
+  function renderMedicamentoForm(){
+    limpiarFab();
+    agendaContentEl.innerHTML = "";
+
+    var h3 = document.createElement("p");
+    h3.style.margin = "0 0 10px";
+    h3.style.fontWeight = "700";
+    h3.style.color = "var(--text)";
+    h3.textContent = "Nuevo medicamento";
+    agendaContentEl.appendChild(h3);
+
+    var nota = document.createElement("p");
+    nota.style.margin = "0 0 14px";
+    nota.style.fontSize = ".76rem";
+    nota.style.color = "var(--text-muted)";
+    nota.textContent = "Registra aquí lo que indicó tu pediatra — este espacio solo guarda y recuerda, no sugiere ni calcula dosis.";
+    agendaContentEl.appendChild(nota);
+
+    agendaContentEl.innerHTML += ""
+      + "<div class=\"fld\"><label for=\"mNombre\">Medicamento</label>"
+      + "<input id=\"mNombre\" type=\"text\" placeholder=\"Ej. Acetaminofén\"></div>"
+      + "<div class=\"fldRow\">"
+      + "<div class=\"fld\"><label for=\"mCantidad\">Cantidad</label><input id=\"mCantidad\" type=\"text\" placeholder=\"Ej. 5 ml\"></div>"
+      + "<div class=\"fld\"><label for=\"mHora\">Hora</label><input id=\"mHora\" type=\"time\"></div>"
+      + "</div>"
+      + "<div class=\"fld\"><label for=\"mFrecuencia\">Frecuencia</label>"
+      + "<select id=\"mFrecuencia\"><option>Cada 8 horas</option><option>Cada 12 horas</option><option>Una vez al día</option><option>Según necesidad</option><option>Otra</option></select></div>"
+      + "<div class=\"fldRow\">"
+      + "<div class=\"fld\"><label for=\"mInicio\">Desde</label><input id=\"mInicio\" type=\"date\"></div>"
+      + "<div class=\"fld\"><label for=\"mFin\">Hasta (opcional)</label><input id=\"mFin\" type=\"date\"></div>"
+      + "</div>"
+      + "<div class=\"fld\"><label for=\"mNotas\">Notas (opcional)</label>"
+      + "<textarea id=\"mNotas\" rows=\"3\" placeholder=\"Indicación textual del pediatra, vía de administración...\"></textarea></div>";
+
+    var btnRow = document.createElement("div");
+    btnRow.className = "btnRow";
+    var cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "btnSecondary";
+    cancelBtn.textContent = "Cancelar";
+    cancelBtn.addEventListener("click", cargarMedicamentos);
+    var saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "btnPrimary";
+    saveBtn.textContent = "Guardar medicamento";
+    saveBtn.addEventListener("click", function(){
+      var nombre = document.getElementById("mNombre").value.trim();
+      if (!nombre) { alert("Escribe el nombre del medicamento."); return; }
+      var payload = {
+        nombre: nombre,
+        cantidad: document.getElementById("mCantidad").value,
+        hora: document.getElementById("mHora").value,
+        frecuencia: document.getElementById("mFrecuencia").value,
+        fecha_inicio: document.getElementById("mInicio").value,
+        fecha_fin: document.getElementById("mFin").value,
+        notas: document.getElementById("mNotas").value,
+      };
+      saveBtn.disabled = true;
+      fetch("/api/medicamentos", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+      }).then(function(r){ return r.json(); }).then(function(data){
+        saveBtn.disabled = false;
+        if (!data.ok) { alert("No se pudo guardar el medicamento. Intenta de nuevo."); return; }
+        cargarMedicamentos();
+      }).catch(function(){ saveBtn.disabled = false; alert("No se pudo guardar el medicamento. Intenta de nuevo."); });
+    });
+    btnRow.appendChild(cancelBtn);
+    btnRow.appendChild(saveBtn);
+    agendaContentEl.appendChild(btnRow);
   }
 
   menuAgenda.addEventListener("click", function(){ closeMoreMenuAnd(openAgendaModal); });
