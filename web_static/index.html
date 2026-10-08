@@ -200,6 +200,80 @@
     color:#fff; font-weight:700; font-size:.9rem; cursor:pointer;
   }
   #termsAcceptBtn:disabled{opacity:.5; cursor:default;}
+
+  /* Modales de Perfil del bebé y Agenda de citas (mismo patrón visual que
+     el modal de Términos, pero con cuerpo scrollable y más alto). */
+  .modalOverlay{position:fixed; inset:0; background:rgba(14,23,22,.55); z-index:100; display:flex; align-items:center; justify-content:center; padding:18px;}
+  .modalOverlay.hidden{display:none;}
+  .modalCard{
+    position:relative; background:var(--surface); border-radius:18px; max-width:420px; width:100%;
+    max-height:85vh; display:flex; flex-direction:column; box-shadow:0 10px 40px rgba(20,50,47,.28); overflow:hidden;
+  }
+  .modalHeader{flex:0 0 auto; display:flex; align-items:center; justify-content:space-between; gap:10px; padding:18px 10px 14px 20px; border-bottom:1px solid var(--border);}
+  .modalHeader h2{margin:0; font-size:1.05rem; color:var(--primary-dark);}
+  .modalCloseBtn{flex:0 0 auto; width:32px; height:32px; border-radius:9px; border:none; background:none; color:var(--text-muted); cursor:pointer; display:flex; align-items:center; justify-content:center;}
+  .modalCloseBtn svg{width:15px;height:15px;}
+  .modalCloseBtn:hover{background:var(--surface-alt); color:var(--text);}
+  .modalBody{flex:1 1 auto; overflow-y:auto; padding:18px 20px calc(20px + env(safe-area-inset-bottom,0px));}
+
+  .fld{margin-bottom:14px;}
+  .fld label{display:block; font-size:.78rem; font-weight:700; color:var(--primary-dark); margin-bottom:6px;}
+  .fld input, .fld select, .fld textarea{
+    width:100%; box-sizing:border-box; font:inherit; font-size:15px; color:var(--text);
+    background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:11px 13px;
+  }
+  .fld input:focus, .fld select:focus, .fld textarea:focus{outline:2px solid var(--primary); outline-offset:1px;}
+  .fldRow{display:flex; gap:10px;}
+  .fldRow .fld{flex:1;}
+
+  .btnPrimary{width:100%; border:none; border-radius:999px; padding:13px; background:var(--primary); color:#fff; font-weight:700; font-size:.9rem; cursor:pointer;}
+  .btnPrimary:disabled{opacity:.55; cursor:default;}
+  .btnSecondary{width:100%; border:1.5px solid var(--border); border-radius:999px; padding:12px; background:var(--surface); color:var(--text-muted); font-weight:700; font-size:.88rem; cursor:pointer;}
+  .btnRow{display:flex; gap:10px; margin-top:4px;}
+  .btnRow .btnPrimary, .btnRow .btnSecondary{width:auto; flex:1;}
+  .btnGhost{border:1.5px dashed var(--primary); border-radius:12px; background:var(--surface-alt); color:var(--primary-dark); font-weight:700; font-size:.82rem; padding:11px; cursor:pointer; width:100%; display:flex; align-items:center; justify-content:center; gap:8px;}
+
+  .stageToggle{display:flex; background:var(--surface-alt); border:1px solid var(--border); border-radius:12px; padding:4px; gap:4px; margin-bottom:16px;}
+  .stageToggle button{flex:1; border:none; border-radius:9px; padding:9px 0; font-size:.82rem; font-weight:700; cursor:pointer; background:transparent; color:var(--text-muted);}
+  .stageToggle button.active{background:var(--primary); color:#fff;}
+
+  .avatarDot{width:32px; height:32px; border-radius:50%; color:#fff; font-size:.72rem; font-weight:700; display:flex; align-items:center; justify-content:center; flex:0 0 auto;}
+  .cuidadorRow{background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:10px 12px; display:flex; align-items:center; gap:10px; margin-bottom:8px;}
+  .cuidadorRow .nombre{margin:0; font-size:.84rem; font-weight:700; color:var(--text);}
+  .cuidadorRow .rol{margin:1px 0 0; font-size:.72rem; color:var(--text-muted);}
+
+  .citaCard{background:var(--bg); border:1px solid var(--border); border-radius:14px; padding:13px 15px; margin-bottom:10px;}
+  .citaCard.pasada{opacity:.6;}
+  .pillTag{display:inline-block; font-size:.68rem; font-weight:700; border-radius:999px; padding:3px 10px; background:var(--surface-alt); color:var(--primary-dark);}
+  .pillTag.alerta{background:var(--danger-bg); color:#A5611A;}
+  .citaCard .fecha{margin:9px 0 2px; font-size:.92rem; font-weight:700; color:var(--text);}
+  .citaCard .lugar{margin:0 0 8px; font-size:.8rem; color:var(--text-muted);}
+  .citaCard .meta{display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;}
+  .citaCard .datos{display:flex; gap:12px; font-size:.76rem; color:var(--text-muted);}
+  .quienAgrego{display:flex; align-items:center; gap:5px; font-size:.7rem; color:var(--text-muted); flex:0 0 auto;}
+  .quienAgrego .avatarDot{width:18px; height:18px; font-size:.58rem;}
+  .citaNotas{margin-top:10px; padding-top:10px; border-top:1px solid var(--border);}
+  .citaNotas textarea{width:100%; box-sizing:border-box; font:inherit; font-size:.86rem; color:var(--text); background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:9px 11px; resize:vertical;}
+  .citaActions{display:flex; gap:14px; margin-top:8px;}
+  .citaActions button{border:none; background:none; color:var(--primary-dark); font-size:.76rem; font-weight:700; cursor:pointer; padding:0; text-decoration:underline;}
+  .citaActions button.danger{color:var(--danger-text);}
+
+  .fabBtn{
+    position:absolute; right:18px; bottom:18px; width:52px; height:52px; border-radius:50%; border:none;
+    background:var(--primary); color:#fff; box-shadow:0 6px 16px rgba(43,106,103,.35);
+    display:flex; align-items:center; justify-content:center; cursor:pointer;
+  }
+  .fabBtn svg{width:20px;height:20px;}
+  .emptyState{text-align:center; padding:30px 10px; color:var(--text-muted); font-size:.86rem;}
+  .toggleSwitch{width:44px; height:26px; border-radius:999px; border:none; cursor:pointer; position:relative; padding:0; background:var(--border); flex:0 0 auto;}
+  .toggleSwitch.on{background:var(--primary);}
+  .toggleSwitch .knob{position:absolute; top:3px; left:3px; width:20px; height:20px; border-radius:50%; background:#fff; transition:left .15s;}
+  .toggleSwitch.on .knob{left:21px;}
+  .toggleRow{display:flex; align-items:center; justify-content:space-between; background:var(--surface-alt); border:1px solid var(--border); border-radius:12px; padding:12px 14px; margin-bottom:14px;}
+  .toggleRow .txt p{margin:0; font-size:.82rem; font-weight:700; color:var(--text);}
+  .toggleRow .txt small{font-size:.72rem; color:var(--text-muted);}
+  .codigoBox{background:var(--surface-alt); border:1px solid var(--border); border-radius:12px; padding:14px; text-align:center; margin-top:10px;}
+  .codigoBox .codigo{font-size:1.4rem; font-weight:700; letter-spacing:.12em; color:var(--primary-dark); font-family:"Baloo 2",sans-serif;}
 </style>
 </head>
 <body>
@@ -216,6 +290,26 @@
         IA, incluida la autorización para tratar los datos sensibles de salud que decida compartir.</span>
       </label>
       <button type="button" id="termsAcceptBtn" disabled>Aceptar y continuar</button>
+    </div>
+  </div>
+
+  <div id="bebeOverlay" class="modalOverlay hidden">
+    <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="bebeModalTitle">
+      <div class="modalHeader">
+        <h2 id="bebeModalTitle">Perfil del bebé</h2>
+        <button type="button" class="modalCloseBtn" id="bebeCloseBtn" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></button>
+      </div>
+      <div class="modalBody" id="bebeModalBody"></div>
+    </div>
+  </div>
+
+  <div id="agendaOverlay" class="modalOverlay hidden">
+    <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="agendaModalTitle">
+      <div class="modalHeader">
+        <h2 id="agendaModalTitle">Agenda de citas</h2>
+        <button type="button" class="modalCloseBtn" id="agendaCloseBtn" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></button>
+      </div>
+      <div class="modalBody" id="agendaModalBody"></div>
     </div>
   </div>
 
@@ -274,6 +368,14 @@
         <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
         Nueva conversación
       </button>
+      <button type="button" class="more-menu-item" id="menuBebe" role="menuitem">
+        <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg></span>
+        Perfil del bebé
+      </button>
+      <button type="button" class="more-menu-item" id="menuAgenda" role="menuitem">
+        <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+        Agenda de citas
+      </button>
       <a href="https://www.tiktok.com/@baby.mathew.ia" target="_blank" rel="noopener" class="more-menu-item" id="menuTikTok" role="menuitem">
         <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.6 5.82c-.84-.73-1.38-1.77-1.5-2.93h-3.03v13.44a3.03 3.03 0 1 1-2.14-2.9V10.3a6.1 6.1 0 1 0 5.17 6.03V9.57a8.13 8.13 0 0 0 4.75 1.53V8.07c-1.19 0-2.3-.4-3.25-1.08l0 0z"/></svg></span>
         Síguenos en TikTok
@@ -311,6 +413,14 @@
   var disclaimerText = document.getElementById("disclaimerText");
   var disclaimerCloseBtn = document.getElementById("disclaimerCloseBtn");
   var DISCLAIMER_DISMISS_KEY = "babymathew_disclaimer_dismissed_v1";
+  var menuBebe = document.getElementById("menuBebe");
+  var menuAgenda = document.getElementById("menuAgenda");
+  var bebeOverlay = document.getElementById("bebeOverlay");
+  var bebeModalBody = document.getElementById("bebeModalBody");
+  var bebeCloseBtn = document.getElementById("bebeCloseBtn");
+  var agendaOverlay = document.getElementById("agendaOverlay");
+  var agendaModalBody = document.getElementById("agendaModalBody");
+  var agendaCloseBtn = document.getElementById("agendaCloseBtn");
 
   var DISCLAIMER_LOCAL = "Soy un asistente informativo, no un profesional de la salud. No diagnostico ni prescribo. Ante cualquier duda urgente, contacta siempre a tu médico o acude a urgencias. Puedes adjuntar hasta 5 documentos o fotos (PDF, imágenes o texto) con el ícono 📎; los uso solo para responder tu pregunta, no quedan guardados. Tu conversación se guarda únicamente en este navegador para que puedas continuarla luego — no se envía a nadie más ni queda en nuestros servidores.";
   var DISCLAIMER_LOGGED_IN = "Soy un asistente informativo, no un profesional de la salud. No diagnostico ni prescribo. Ante cualquier duda urgente, contacta siempre a tu médico o acude a urgencias. Puedes adjuntar hasta 5 documentos o fotos (PDF, imágenes o texto) con el ícono 📎; los uso solo para responder tu pregunta, no quedan guardados. Tu conversación se guarda en tu cuenta para que puedas continuarla luego desde cualquier dispositivo.";
@@ -1008,6 +1118,512 @@
       await fetch("/api/accept-terms", { method: "POST" });
     } catch (e) { /* si falla, la evidencia local ya quedó guardada */ }
   });
+
+  // --- Perfil del bebé + Agenda de citas ------------------------------
+  // Ambas funciones requieren sesión iniciada porque el perfil se comparte
+  // entre cuidadores vinculados (ver /api/bebe en el backend) y necesitamos
+  // saber quién es quién.
+  var AVATAR_COLORS = ["#3E8E8A", "#A05C9E", "#C77B3E", "#5C7FA5"];
+  function avatarColorFor(nombre){
+    var n = (nombre || "?").trim();
+    var idx = n.length ? n.charCodeAt(0) % AVATAR_COLORS.length : 0;
+    return AVATAR_COLORS[idx];
+  }
+  function inicialesDe(nombre){
+    var partes = (nombre || "?").trim().split(/\s+/);
+    var ini = partes[0] ? partes[0][0] : "?";
+    if (partes.length > 1 && partes[1]) ini += partes[1][0];
+    return ini.toUpperCase();
+  }
+  function fmtFecha(iso){
+    if (!iso) return "";
+    var p = iso.split("-");
+    if (p.length !== 3) return iso;
+    var meses = ["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+    return p[2] + " " + meses[parseInt(p[1], 10) - 1] + ". " + p[0];
+  }
+
+  function closeMoreMenuAnd(fn){
+    closeMoreMenu();
+    fn();
+  }
+
+  function requiereLogin(overlayBody){
+    overlayBody.innerHTML = "";
+    var p = document.createElement("p");
+    p.style.color = "var(--text-muted)";
+    p.style.fontSize = ".88rem";
+    p.style.lineHeight = "1.5";
+    p.textContent = "Esta función guarda información compartida entre los cuidadores del bebé, así que primero necesitas iniciar sesión con Google.";
+    var btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "btnPrimary";
+    btn.style.marginTop = "14px";
+    btn.textContent = "Iniciar sesión con Google";
+    btn.addEventListener("click", function(){ window.location.href = "/auth/login"; });
+    overlayBody.appendChild(p);
+    overlayBody.appendChild(btn);
+  }
+
+  // ---- Perfil del bebé -------------------------------------------------
+  function openBebeModal(){
+    bebeOverlay.classList.remove("hidden");
+    if (!loggedIn) { requiereLogin(bebeModalBody); return; }
+    bebeModalBody.innerHTML = "<p style=\"color:var(--text-muted);font-size:.86rem;\">Cargando…</p>";
+    fetch("/api/bebe").then(function(r){ return r.json(); }).then(function(data){
+      renderBebeModal(data.bebe, data.cuidadores || []);
+    }).catch(function(){
+      bebeModalBody.innerHTML = "<p style=\"color:var(--danger-text);font-size:.86rem;\">No se pudo cargar el perfil. Intenta de nuevo.</p>";
+    });
+  }
+
+  function renderBebeModal(bebe, cuidadores){
+    bebeModalBody.innerHTML = "";
+    if (!bebe) {
+      renderBebeCrearOVincular();
+      return;
+    }
+
+    var resumen = document.createElement("div");
+    resumen.className = "fld";
+    var etapaTxt = bebe.etapa === "gestacion"
+      ? "En gestación" + (bebe.semana_gestacion ? " · semana " + bebe.semana_gestacion : "")
+      : "Ya nació" + (bebe.fecha_nacimiento ? " · " + fmtFecha(bebe.fecha_nacimiento) : "");
+    resumen.innerHTML = "<label>" + (bebe.nombre ? escapeHtml(bebe.nombre) : "Perfil del bebé") + "</label>"
+      + "<p style=\"margin:0;font-size:.86rem;color:var(--text-muted);\">" + escapeHtml(etapaTxt) + "</p>";
+    bebeModalBody.appendChild(resumen);
+
+    var editBtn = document.createElement("button");
+    editBtn.type = "button";
+    editBtn.className = "btnSecondary";
+    editBtn.style.marginBottom = "18px";
+    editBtn.textContent = "Editar datos";
+    editBtn.addEventListener("click", function(){ renderBebeForm(bebe); });
+    bebeModalBody.appendChild(editBtn);
+
+    var labelCuidadores = document.createElement("label");
+    labelCuidadores.textContent = "Cuidadores vinculados";
+    bebeModalBody.appendChild(labelCuidadores);
+    cuidadores.forEach(function(c){
+      var row = document.createElement("div");
+      row.className = "cuidadorRow";
+      var dot = document.createElement("div");
+      dot.className = "avatarDot";
+      dot.style.background = avatarColorFor(c.name);
+      dot.textContent = inicialesDe(c.name);
+      row.appendChild(dot);
+      var txt = document.createElement("div");
+      txt.innerHTML = "<p class=\"nombre\">" + escapeHtml(c.name || "Cuidador") + "</p>"
+        + "<p class=\"rol\">" + escapeHtml(c.rol || "Cuidador") + "</p>";
+      row.appendChild(txt);
+      bebeModalBody.appendChild(row);
+    });
+
+    var inviteBtn = document.createElement("button");
+    inviteBtn.type = "button";
+    inviteBtn.className = "btnGhost";
+    inviteBtn.style.marginTop = "6px";
+    inviteBtn.innerHTML = "<svg width=\"15\" height=\"15\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M8 3v10M3 8h10\"/></svg> Invitar a otro cuidador";
+    inviteBtn.addEventListener("click", function(){ generarInvitacion(inviteBtn); });
+    bebeModalBody.appendChild(inviteBtn);
+
+    var nota = document.createElement("p");
+    nota.style.margin = "10px 0 0";
+    nota.style.fontSize = ".7rem";
+    nota.style.color = "var(--text-muted)";
+    nota.style.textAlign = "center";
+    nota.textContent = "Comparte el código con el otro padre o cuidador — verá la misma agenda y notas del bebé.";
+    bebeModalBody.appendChild(nota);
+  }
+
+  function generarInvitacion(btn){
+    btn.disabled = true;
+    fetch("/api/bebe/invitar", { method: "POST" }).then(function(r){ return r.json(); }).then(function(data){
+      btn.disabled = false;
+      if (!data.ok) { alert("No se pudo generar el código. Intenta de nuevo."); return; }
+      var box = document.createElement("div");
+      box.className = "codigoBox";
+      box.innerHTML = "<p style=\"margin:0 0 6px;font-size:.76rem;color:var(--text-muted);\">Código de invitación (vence al usarse)</p>"
+        + "<div class=\"codigo\">" + escapeHtml(data.codigo) + "</div>";
+      btn.insertAdjacentElement("afterend", box);
+    }).catch(function(){ btn.disabled = false; alert("No se pudo generar el código. Intenta de nuevo."); });
+  }
+
+  function renderBebeCrearOVincular(){
+    bebeModalBody.innerHTML = "";
+    var intro = document.createElement("p");
+    intro.style.margin = "0 0 14px";
+    intro.style.fontSize = ".86rem";
+    intro.style.color = "var(--text-muted)";
+    intro.textContent = "Aún no has creado el perfil del bebé. Créalo o, si el otro padre/cuidador ya lo hizo, ingresa el código que te compartió.";
+    bebeModalBody.appendChild(intro);
+
+    var crearBtn = document.createElement("button");
+    crearBtn.type = "button";
+    crearBtn.className = "btnPrimary";
+    crearBtn.textContent = "Crear perfil del bebé";
+    crearBtn.addEventListener("click", function(){ renderBebeForm(null); });
+    bebeModalBody.appendChild(crearBtn);
+
+    var sep = document.createElement("p");
+    sep.style.textAlign = "center";
+    sep.style.fontSize = ".78rem";
+    sep.style.color = "var(--text-muted)";
+    sep.style.margin = "16px 0";
+    sep.textContent = "— o —";
+    bebeModalBody.appendChild(sep);
+
+    var codigoFld = document.createElement("div");
+    codigoFld.className = "fld";
+    codigoFld.innerHTML = "<label for=\"codigoVincular\">Código de invitación</label>"
+      + "<input id=\"codigoVincular\" type=\"text\" placeholder=\"Ej. A3F9K2\" maxlength=\"6\" style=\"text-transform:uppercase;\">";
+    bebeModalBody.appendChild(codigoFld);
+
+    var rolFld = document.createElement("div");
+    rolFld.className = "fld";
+    rolFld.innerHTML = "<label for=\"rolVincular\">Tu rol</label>"
+      + "<select id=\"rolVincular\"><option>Mamá</option><option>Papá</option><option>Cuidador</option></select>";
+    bebeModalBody.appendChild(rolFld);
+
+    var vincularBtn = document.createElement("button");
+    vincularBtn.type = "button";
+    vincularBtn.className = "btnSecondary";
+    vincularBtn.textContent = "Vincularme con este código";
+    vincularBtn.addEventListener("click", function(){
+      var codigo = document.getElementById("codigoVincular").value.trim();
+      var rol = document.getElementById("rolVincular").value;
+      if (!codigo) return;
+      vincularBtn.disabled = true;
+      fetch("/api/bebe/vincular", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ codigo: codigo, rol: rol })
+      }).then(function(r){ return r.json(); }).then(function(data){
+        vincularBtn.disabled = false;
+        if (!data.ok) {
+          alert(data.error === "codigo_invalido" ? "Ese código no es válido o ya fue usado." : "No se pudo vincular. Intenta de nuevo.");
+          return;
+        }
+        openBebeModal();
+      }).catch(function(){ vincularBtn.disabled = false; alert("No se pudo vincular. Intenta de nuevo."); });
+    });
+    bebeModalBody.appendChild(vincularBtn);
+  }
+
+  function renderBebeForm(bebe){
+    bebeModalBody.innerHTML = "";
+    var etapaActual = bebe ? bebe.etapa : "gestacion";
+
+    var toggle = document.createElement("div");
+    toggle.className = "stageToggle";
+    var btnGest = document.createElement("button");
+    btnGest.type = "button";
+    btnGest.textContent = "En gestación";
+    var btnNac = document.createElement("button");
+    btnNac.type = "button";
+    btnNac.textContent = "Ya nació";
+    toggle.appendChild(btnGest);
+    toggle.appendChild(btnNac);
+    bebeModalBody.appendChild(toggle);
+
+    var camposWrap = document.createElement("div");
+    bebeModalBody.appendChild(camposWrap);
+
+    function pintarCampos(etapa){
+      etapaActual = etapa;
+      btnGest.className = etapa === "gestacion" ? "active" : "";
+      btnNac.className = etapa === "nacido" ? "active" : "";
+      if (etapa === "gestacion") {
+        camposWrap.innerHTML =
+          "<div class=\"fld\"><label for=\"fNombre\">Nombre del bebé (opcional)</label>"
+          + "<input id=\"fNombre\" type=\"text\" placeholder=\"Ej. Mateo\"></div>"
+          + "<div class=\"fld\"><label for=\"fSemana\">Semana de gestación</label>"
+          + "<input id=\"fSemana\" type=\"number\" min=\"1\" max=\"42\" placeholder=\"Ej. 28\"></div>"
+          + "<div class=\"fld\"><label for=\"fFpp\">Fecha probable de parto (opcional)</label>"
+          + "<input id=\"fFpp\" type=\"date\"></div>";
+      } else {
+        camposWrap.innerHTML =
+          "<div class=\"fld\"><label for=\"fNombre\">Nombre del bebé</label>"
+          + "<input id=\"fNombre\" type=\"text\" placeholder=\"Ej. Mateo\"></div>"
+          + "<div class=\"fld\"><label for=\"fNacimiento\">Fecha de nacimiento</label>"
+          + "<input id=\"fNacimiento\" type=\"date\"></div>"
+          + "<div class=\"fld\"><label for=\"fSexo\">Sexo (opcional)</label>"
+          + "<select id=\"fSexo\"><option value=\"\">Prefiero no decir</option><option>Niño</option><option>Niña</option></select></div>";
+      }
+      if (bebe) {
+        var elNombre = document.getElementById("fNombre"); if (elNombre) elNombre.value = bebe.nombre || "";
+        if (etapa === "gestacion") {
+          var elSemana = document.getElementById("fSemana"); if (elSemana && bebe.semana_gestacion) elSemana.value = bebe.semana_gestacion;
+          var elFpp = document.getElementById("fFpp"); if (elFpp && bebe.fecha_parto_probable) elFpp.value = bebe.fecha_parto_probable;
+        } else {
+          var elNac = document.getElementById("fNacimiento"); if (elNac && bebe.fecha_nacimiento) elNac.value = bebe.fecha_nacimiento;
+          var elSexo = document.getElementById("fSexo"); if (elSexo && bebe.sexo) elSexo.value = bebe.sexo;
+        }
+      }
+    }
+    btnGest.addEventListener("click", function(){ pintarCampos("gestacion"); });
+    btnNac.addEventListener("click", function(){ pintarCampos("nacido"); });
+    pintarCampos(etapaActual);
+
+    if (!bebe) {
+      var rolWrap = document.createElement("div");
+      rolWrap.className = "fld";
+      rolWrap.innerHTML = "<label for=\"fRol\">Tu rol</label>"
+        + "<select id=\"fRol\"><option>Mamá</option><option>Papá</option><option>Cuidador</option></select>";
+      camposWrap.appendChild(rolWrap);
+    }
+
+    var guardarBtn = document.createElement("button");
+    guardarBtn.type = "button";
+    guardarBtn.className = "btnPrimary";
+    guardarBtn.textContent = "Guardar perfil";
+    guardarBtn.addEventListener("click", function(){
+      var payload = { etapa: etapaActual, nombre: (document.getElementById("fNombre") || {}).value || "" };
+      if (etapaActual === "gestacion") {
+        payload.semana_gestacion = parseInt((document.getElementById("fSemana") || {}).value || "", 10) || null;
+        payload.fecha_parto_probable = (document.getElementById("fFpp") || {}).value || "";
+      } else {
+        payload.fecha_nacimiento = (document.getElementById("fNacimiento") || {}).value || "";
+        payload.sexo = (document.getElementById("fSexo") || {}).value || "";
+      }
+      var rolEl = document.getElementById("fRol");
+      if (rolEl) payload.rol = rolEl.value;
+      guardarBtn.disabled = true;
+      fetch("/api/bebe", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+      }).then(function(r){ return r.json(); }).then(function(data){
+        guardarBtn.disabled = false;
+        if (!data.ok) { alert("No se pudo guardar. Intenta de nuevo."); return; }
+        openBebeModal();
+      }).catch(function(){ guardarBtn.disabled = false; alert("No se pudo guardar. Intenta de nuevo."); });
+    });
+    bebeModalBody.appendChild(guardarBtn);
+  }
+
+  menuBebe.addEventListener("click", function(){ closeMoreMenuAnd(openBebeModal); });
+  bebeCloseBtn.addEventListener("click", function(){ bebeOverlay.classList.add("hidden"); });
+  bebeOverlay.addEventListener("click", function(ev){ if (ev.target === bebeOverlay) bebeOverlay.classList.add("hidden"); });
+
+  // ---- Agenda de citas ---------------------------------------------------
+  function openAgendaModal(){
+    agendaOverlay.classList.remove("hidden");
+    limpiarFab();
+    if (!loggedIn) { requiereLogin(agendaModalBody); return; }
+    agendaModalBody.innerHTML = "<p style=\"color:var(--text-muted);font-size:.86rem;\">Cargando…</p>";
+    fetch("/api/bebe").then(function(r){ return r.json(); }).then(function(data){
+      if (!data.bebe) {
+        agendaModalBody.innerHTML = "";
+        var p = document.createElement("p");
+        p.style.fontSize = ".86rem";
+        p.style.color = "var(--text-muted)";
+        p.textContent = "Primero crea el perfil del bebé para poder agendar sus citas.";
+        var btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "btnPrimary";
+        btn.style.marginTop = "14px";
+        btn.textContent = "Ir a Perfil del bebé";
+        btn.addEventListener("click", function(){ agendaOverlay.classList.add("hidden"); openBebeModal(); });
+        agendaModalBody.appendChild(p);
+        agendaModalBody.appendChild(btn);
+        return;
+      }
+      cargarCitas();
+    }).catch(function(){
+      agendaModalBody.innerHTML = "<p style=\"color:var(--danger-text);font-size:.86rem;\">No se pudo cargar la agenda. Intenta de nuevo.</p>";
+    });
+  }
+
+  function cargarCitas(){
+    agendaModalBody.innerHTML = "<p style=\"color:var(--text-muted);font-size:.86rem;\">Cargando…</p>";
+    fetch("/api/citas").then(function(r){ return r.json(); }).then(function(data){
+      renderAgendaLista(data.citas || []);
+    }).catch(function(){
+      agendaModalBody.innerHTML = "<p style=\"color:var(--danger-text);font-size:.86rem;\">No se pudo cargar la agenda. Intenta de nuevo.</p>";
+    });
+  }
+
+  function renderAgendaLista(citas){
+    agendaModalBody.innerHTML = "";
+    agendaModalBody.style.paddingBottom = "80px";
+    if (!citas.length) {
+      var empty = document.createElement("div");
+      empty.className = "emptyState";
+      empty.textContent = "Todavía no hay citas agendadas.";
+      agendaModalBody.appendChild(empty);
+    } else {
+      var hoy = new Date().toISOString().slice(0, 10);
+      citas.forEach(function(c){
+        var card = document.createElement("div");
+        card.className = "citaCard" + (c.estado === "realizada" || c.estado === "cancelada" ? " pasada" : "");
+        var pills = "<span class=\"pillTag\">" + escapeHtml(c.especialidad) + "</span>";
+        if (c.estado === "realizada") pills += " <span class=\"pillTag\">Realizada</span>";
+        else if (c.estado === "cancelada") pills += " <span class=\"pillTag\">Cancelada</span>";
+        else if (c.avisarme) pills += " <span class=\"pillTag alerta\">🔔 Avisarme</span>";
+
+        var datos = [];
+        if (c.valor) datos.push("💲 " + escapeHtml(c.valor));
+        var lugarLinea = [c.medico, c.lugar].filter(Boolean).map(escapeHtml).join(" · ");
+
+        card.innerHTML =
+          "<div class=\"meta\">" + pills + "</div>"
+          + "<p class=\"fecha\">" + escapeHtml(fmtFecha(c.fecha)) + (c.hora ? " · " + escapeHtml(c.hora) : "") + "</p>"
+          + (lugarLinea ? "<p class=\"lugar\">" + lugarLinea + "</p>" : "")
+          + "<div class=\"meta\"><div class=\"datos\">" + datos.join(" ") + "</div>"
+          + "<span class=\"quienAgrego\"><span class=\"avatarDot\" style=\"background:" + avatarColorFor(c.creado_por_nombre) + "\">" + inicialesDe(c.creado_por_nombre) + "</span>" + escapeHtml(c.creado_por_nombre || "") + "</span></div>";
+
+        var notasWrap = document.createElement("div");
+        notasWrap.className = "citaNotas";
+        notasWrap.style.display = "none";
+        notasWrap.innerHTML = "<textarea rows=\"3\" placeholder=\"Recomendaciones del médico, medicamentos formulados...\">" + escapeHtml(c.notas || "") + "</textarea>";
+        var guardarNotaBtn = document.createElement("button");
+        guardarNotaBtn.type = "button";
+        guardarNotaBtn.className = "btnSecondary";
+        guardarNotaBtn.style.marginTop = "8px";
+        guardarNotaBtn.textContent = "Guardar nota";
+        guardarNotaBtn.addEventListener("click", function(){
+          var val = notasWrap.querySelector("textarea").value;
+          fetch("/api/citas/" + c.id, {
+            method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ notas: val })
+          }).then(function(){ cargarCitas(); });
+        });
+        notasWrap.appendChild(guardarNotaBtn);
+        card.appendChild(notasWrap);
+
+        var actions = document.createElement("div");
+        actions.className = "citaActions";
+        var notasBtn = document.createElement("button");
+        notasBtn.type = "button";
+        notasBtn.textContent = c.notas ? "Ver/editar notas" : "Agregar notas";
+        notasBtn.addEventListener("click", function(){
+          notasWrap.style.display = notasWrap.style.display === "none" ? "block" : "none";
+        });
+        actions.appendChild(notasBtn);
+
+        if (c.estado === "pendiente" && c.fecha >= hoy) {
+          var realizadaBtn = document.createElement("button");
+          realizadaBtn.type = "button";
+          realizadaBtn.textContent = "Marcar realizada";
+          realizadaBtn.addEventListener("click", function(){
+            fetch("/api/citas/" + c.id, {
+              method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "realizada" })
+            }).then(function(){ cargarCitas(); });
+          });
+          actions.appendChild(realizadaBtn);
+        }
+
+        var delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.className = "danger";
+        delBtn.textContent = "Eliminar";
+        delBtn.addEventListener("click", function(){
+          if (!confirm("¿Eliminar esta cita?")) return;
+          fetch("/api/citas/" + c.id, { method: "DELETE" }).then(function(){ cargarCitas(); });
+        });
+        actions.appendChild(delBtn);
+
+        card.appendChild(actions);
+        agendaModalBody.appendChild(card);
+      });
+    }
+
+    var fab = document.createElement("button");
+    fab.type = "button";
+    fab.className = "fabBtn";
+    fab.setAttribute("aria-label", "Agendar nueva cita");
+    fab.innerHTML = "<svg viewBox=\"0 0 22 22\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M11 4v14M4 11h14\"/></svg>";
+    fab.addEventListener("click", renderAgendaForm);
+    agendaModalBody.parentNode.appendChild(fab);
+    agendaModalBody._fab = fab;
+  }
+
+  function limpiarFab(){
+    var card = agendaModalBody.parentNode;
+    var fab = card.querySelector(".fabBtn");
+    if (fab) fab.remove();
+  }
+
+  function renderAgendaForm(){
+    limpiarFab();
+    agendaModalBody.innerHTML = "";
+    agendaModalBody.style.paddingBottom = "20px";
+
+    var h3 = document.createElement("p");
+    h3.style.margin = "0 0 14px";
+    h3.style.fontWeight = "700";
+    h3.style.color = "var(--text)";
+    h3.textContent = "Nueva cita";
+    agendaModalBody.appendChild(h3);
+
+    agendaModalBody.innerHTML += ""
+      + "<div class=\"fld\"><label for=\"cEspecialidad\">Especialidad</label>"
+      + "<select id=\"cEspecialidad\"><option>Pediatría (control)</option><option>Vacunas</option><option>Estimulación</option><option>Nutrición</option><option>Otra</option></select></div>"
+      + "<div class=\"fldRow\">"
+      + "<div class=\"fld\"><label for=\"cFecha\">Fecha</label><input id=\"cFecha\" type=\"date\"></div>"
+      + "<div class=\"fld\"><label for=\"cHora\">Hora</label><input id=\"cHora\" type=\"time\"></div>"
+      + "</div>"
+      + "<div class=\"fld\"><label for=\"cLugar\">Lugar</label><input id=\"cLugar\" type=\"text\" placeholder=\"Ej. IPS Vida Envigado\"></div>"
+      + "<div class=\"fld\"><label for=\"cMedico\">Nombre del médico o profesional</label><input id=\"cMedico\" type=\"text\" placeholder=\"Ej. Dra. Laura Gómez\"></div>"
+      + "<div class=\"fld\"><label for=\"cValor\">Valor (COP)</label><input id=\"cValor\" type=\"text\" placeholder=\"Ej. 85.000\"></div>";
+
+    var toggleRow = document.createElement("div");
+    toggleRow.className = "toggleRow";
+    toggleRow.innerHTML = "<div class=\"txt\"><p>Avisarme antes</p><small>Recordatorio el día anterior</small></div>";
+    var toggleBtn = document.createElement("button");
+    toggleBtn.type = "button";
+    toggleBtn.className = "toggleSwitch";
+    toggleBtn.innerHTML = "<span class=\"knob\"></span>";
+    var avisarme = false;
+    toggleBtn.addEventListener("click", function(){
+      avisarme = !avisarme;
+      toggleBtn.classList.toggle("on", avisarme);
+    });
+    toggleRow.appendChild(toggleBtn);
+    agendaModalBody.appendChild(toggleRow);
+
+    agendaModalBody.innerHTML += "<div class=\"fld\"><label for=\"cNotas\">Notas (opcional)</label>"
+      + "<textarea id=\"cNotas\" rows=\"3\" placeholder=\"Recomendaciones, medicamentos...\"></textarea></div>";
+
+    var btnRow = document.createElement("div");
+    btnRow.className = "btnRow";
+    var cancelBtn = document.createElement("button");
+    cancelBtn.type = "button";
+    cancelBtn.className = "btnSecondary";
+    cancelBtn.textContent = "Cancelar";
+    cancelBtn.addEventListener("click", cargarCitas);
+    var saveBtn = document.createElement("button");
+    saveBtn.type = "button";
+    saveBtn.className = "btnPrimary";
+    saveBtn.textContent = "Guardar cita";
+    saveBtn.addEventListener("click", function(){
+      var especialidad = document.getElementById("cEspecialidad").value;
+      var fecha = document.getElementById("cFecha").value;
+      if (!fecha) { alert("Elige la fecha de la cita."); return; }
+      var payload = {
+        especialidad: especialidad,
+        fecha: fecha,
+        hora: document.getElementById("cHora").value,
+        lugar: document.getElementById("cLugar").value,
+        medico: document.getElementById("cMedico").value,
+        valor: document.getElementById("cValor").value,
+        avisarme: avisarme,
+        notas: document.getElementById("cNotas").value,
+      };
+      saveBtn.disabled = true;
+      fetch("/api/citas", {
+        method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload)
+      }).then(function(r){ return r.json(); }).then(function(data){
+        saveBtn.disabled = false;
+        if (!data.ok) { alert("No se pudo guardar la cita. Intenta de nuevo."); return; }
+        cargarCitas();
+      }).catch(function(){ saveBtn.disabled = false; alert("No se pudo guardar la cita. Intenta de nuevo."); });
+    });
+    btnRow.appendChild(cancelBtn);
+    btnRow.appendChild(saveBtn);
+    agendaModalBody.appendChild(btnRow);
+  }
+
+  menuAgenda.addEventListener("click", function(){ closeMoreMenuAnd(openAgendaModal); });
+  agendaCloseBtn.addEventListener("click", function(){ limpiarFab(); agendaOverlay.classList.add("hidden"); });
+  agendaOverlay.addEventListener("click", function(ev){ if (ev.target === agendaOverlay) { limpiarFab(); agendaOverlay.classList.add("hidden"); } });
 
   (async function init(){
     var me = { logged_in: false };
