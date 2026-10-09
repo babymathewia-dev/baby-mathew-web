@@ -22,7 +22,8 @@ import base64
 import logging
 import secrets
 import sqlite3
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
+from zoneinfo import ZoneInfo
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
@@ -511,6 +512,27 @@ def init_db():
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         )"""
     )
+    # Registro de qué recordatorios ya se enviaron, para no duplicar un
+    # correo si el Cron Job se dispara más de una vez en la misma ventana
+    # (ej. una corrida manual "Trigger Run" el mismo día, o un reintento).
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS cita_avisos_enviados (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            cita_id INTEGER NOT NULL REFERENCES citas(id),
+            fecha_envio TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (cita_id, fecha_envio)
+        )"""
+    )
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS medicamento_avisos_enviados (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            medicamento_id INTEGER NOT NULL REFERENCES medicamentos(id),
+            fecha_envio TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (medicamento_id, fecha_envio)
+        )"""
+    )
     conn.commit()
     conn.close()
 
@@ -896,6 +918,32 @@ def api_citas_update(cita_id):
     data = request.get_json(silent=True) or {}
     campos = []
     valores = []
+    if "especialidad" in data:
+        especialidad = (data.get("especialidad") or "").strip()[:80]
+        if not especialidad:
+            conn.close()
+            return jsonify({"error": "invalid_request"}), 400
+        campos.append("especialidad = ?")
+        valores.append(especialidad)
+    if "fecha" in data:
+        fecha = (data.get("fecha") or "").strip()[:10]
+        if not fecha:
+            conn.close()
+            return jsonify({"error": "invalid_request"}), 400
+        campos.append("fecha = ?")
+        valores.append(fecha)
+    if "hora" in data:
+        campos.append("hora = ?")
+        valores.append((data.get("hora") or "").strip()[:5] or None)
+    if "lugar" in data:
+        campos.append("lugar = ?")
+        valores.append((data.get("lugar") or "").strip()[:120] or None)
+    if "medico" in data:
+        campos.append("medico = ?")
+        valores.append((data.get("medico") or "").strip()[:120] or None)
+    if "valor" in data:
+        campos.append("valor = ?")
+        valores.append((data.get("valor") or "").strip()[:40] or None)
     if "notas" in data:
         campos.append("notas = ?")
         valores.append((data.get("notas") or "").strip()[:2000] or None)
@@ -1040,8 +1088,34 @@ def api_medicamentos_delete(medicamento_id):
 
 
 # ---------------------------------------------------------------------------
-# Recordatorios por correo: citas (día anterior) y medicamentos activos (hoy)
+# Recordatorios por correo: citas (6pm de la noche anterior) y medicamentos
+# (30 minutos antes de la hora configurada por el cuidador). Son dos Cron
+# Jobs separados en Render que llaman a este mismo endpoint con ?tipo=citas
+# o ?tipo=medicamentos -- citas corre una vez al día a las 6pm, medicamentos
+# corre cada 5 minutos (porque la hora de cada medicamento es distinta).
 # ---------------------------------------------------------------------------
+BOGOTA_TZ = ZoneInfo("America/Bogota")
+
+
+def _ya_enviado(conn, tabla, columna_id, item_id, fecha_envio):
+    row = conn.execute(
+        f"SELECT 1 FROM {tabla} WHERE {columna_id} = ? AND fecha_envio = ?",
+        (item_id, fecha_envio),
+    ).fetchone()
+    return row is not None
+
+
+def _marcar_enviado(conn, tabla, columna_id, item_id, fecha_envio):
+    try:
+        conn.execute(
+            f"INSERT INTO {tabla} ({columna_id}, fecha_envio) VALUES (?, ?)",
+            (item_id, fecha_envio),
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        pass  # ya estaba marcado (carrera entre corridas) -- no es un error
+
+
 def _enviar_correo(destinatario, asunto, html):
     """Envía un correo vía Resend. Devuelve True/False; nunca lanza excepción
     hacia el llamador (un fallo de envío no debe tumbar el resto del job)."""
@@ -1080,105 +1154,157 @@ def _nombre_bebe(conn, bebe_id):
     return row["nombre"] or ("tu bebé en camino" if row["etapa"] == "gestacion" else "tu bebé")
 
 
-def _html_recordatorio(nombre_bebe, citas, medicamentos):
-    partes = [
-        "<div style=\"font-family:'Source Sans 3',Arial,sans-serif;color:#173330;max-width:480px;margin:0 auto;\">",
-        "<h2 style=\"color:#2B6A67;\">Recordatorios de " + nombre_bebe + "</h2>",
-    ]
-    if citas:
-        partes.append("<h3 style=\"color:#2B6A67;font-size:1rem;\">📅 Cita médica mañana</h3>")
-        for c in citas:
-            linea = f"{c['especialidad']} — {c['fecha']}"
-            if c.get("hora"):
-                linea += f" a las {c['hora']}"
-            if c.get("lugar"):
-                linea += f"<br>Lugar: {c['lugar']}"
-            if c.get("medico"):
-                linea += f"<br>Con: {c['medico']}"
-            partes.append(f"<p style='background:#EAF6F4;border-radius:10px;padding:12px 14px;'>{linea}</p>")
-    if medicamentos:
-        partes.append("<h3 style=\"color:#2B6A67;font-size:1rem;\">💊 Medicamentos de hoy</h3>")
-        partes.append(
-            "<p style='font-size:.78rem;color:#5C7A76;'>Tal como lo registraste según indicación médica. "
-            "Baby Mathew IA no sugiere ni calcula dosis.</p>"
-        )
-        for m in medicamentos:
-            linea = f"{m['nombre']}"
-            if m.get("cantidad"):
-                linea += f" — {m['cantidad']}"
-            if m.get("hora"):
-                linea += f" a las {m['hora']}"
-            if m.get("frecuencia"):
-                linea += f"<br>Frecuencia: {m['frecuencia']}"
-            partes.append(f"<p style='background:#EAF6F4;border-radius:10px;padding:12px 14px;'>{linea}</p>")
-    partes.append(
+def _html_cita(nombre_bebe, cita):
+    linea = f"Recuerda que mañana tienes la cita de <strong>{cita['especialidad']}</strong>"
+    if cita.get("lugar"):
+        linea += f" en {cita['lugar']}"
+    if cita.get("hora"):
+        linea += f" a las {cita['hora']}"
+    linea += "."
+    extra = ""
+    if cita.get("medico"):
+        extra += f"<p style='margin:4px 0 0;color:#5C7A76;'>Con: {cita['medico']}</p>"
+    return (
+        "<div style=\"font-family:'Source Sans 3',Arial,sans-serif;color:#173330;max-width:480px;margin:0 auto;\">"
+        f"<h2 style='color:#2B6A67;'>📅 Cita de {nombre_bebe} mañana</h2>"
+        f"<p style='background:#EAF6F4;border-radius:10px;padding:12px 14px;'>{linea}{extra}</p>"
         "<p style='font-size:.72rem;color:#93ACA8;margin-top:20px;'>Baby Mathew IA · "
         "Este correo es un recordatorio de lo que tú registraste, no un consejo médico.</p>"
+        "</div>"
     )
-    partes.append("</div>")
-    return "".join(partes)
 
 
-@app.route("/api/tareas/enviar-alertas", methods=["POST"])
-def api_tareas_enviar_alertas():
-    """Dispara el envío diario de recordatorios. Protegido por un token
-    secreto (header X-Tarea-Token) — pensado para ser llamado por un Cron Job
-    de Render, no por el navegador del usuario."""
-    token_recibido = request.headers.get("X-Tarea-Token", "")
-    if not TAREAS_SECRET_TOKEN or not secrets.compare_digest(token_recibido, TAREAS_SECRET_TOKEN):
-        return jsonify({"error": "no_autorizado"}), 401
+def _html_medicamento(nombre_bebe, med):
+    linea = f"En 30 minutos toca <strong>{med['nombre']}</strong>"
+    if med.get("cantidad"):
+        linea += f" — {med['cantidad']}"
+    if med.get("hora"):
+        linea += f", a las {med['hora']}"
+    linea += "."
+    extra = ""
+    if med.get("frecuencia"):
+        extra += f"<p style='margin:4px 0 0;color:#5C7A76;'>Frecuencia: {med['frecuencia']}</p>"
+    return (
+        "<div style=\"font-family:'Source Sans 3',Arial,sans-serif;color:#173330;max-width:480px;margin:0 auto;\">"
+        f"<h2 style='color:#2B6A67;'>💊 Medicamento de {nombre_bebe}</h2>"
+        f"<p style='background:#EAF6F4;border-radius:10px;padding:12px 14px;'>{linea}{extra}</p>"
+        "<p style='font-size:.78rem;color:#5C7A76;'>Tal como lo registraste según indicación médica. "
+        "Baby Mathew IA no sugiere ni calcula dosis.</p>"
+        "<p style='font-size:.72rem;color:#93ACA8;margin-top:20px;'>Baby Mathew IA · "
+        "Este correo es un recordatorio de lo que tú registraste, no un consejo médico.</p>"
+        "</div>"
+    )
 
-    hoy = date.today()
-    manana = (hoy + timedelta(days=1)).isoformat()
-    hoy_str = hoy.isoformat()
 
-    conn = get_db()
+def _en_ventana_30min_antes(hora_str, ahora, ventana_minutos):
+    """True si 'ahora' cae dentro de los 'ventana_minutos' siguientes al
+    instante que es exactamente 30 minutos antes de hora_str (HH:MM) de hoy.
+    Pensado para un Cron Job que corre cada 'ventana_minutos' minutos."""
+    if not hora_str:
+        return False
+    try:
+        h, m = (int(x) for x in hora_str.split(":")[:2])
+    except (ValueError, AttributeError):
+        return False
+    objetivo = ahora.replace(hour=h, minute=m, second=0, microsecond=0) - timedelta(minutes=30)
+    delta_min = (ahora - objetivo).total_seconds() / 60
+    return 0 <= delta_min < ventana_minutos
 
-    citas_rows = conn.execute(
+
+def _enviar_recordatorios_citas(conn):
+    manana = (date.today() + timedelta(days=1)).isoformat()
+    hoy_str = date.today().isoformat()
+    citas = conn.execute(
         """SELECT * FROM citas WHERE estado = 'pendiente' AND avisarme = 1 AND fecha = ?""",
         (manana,),
     ).fetchall()
 
-    medicamentos_rows = conn.execute(
+    enviados, fallidos, procesadas = 0, 0, 0
+    for c in citas:
+        c = dict(c)
+        if _ya_enviado(conn, "cita_avisos_enviados", "cita_id", c["id"], hoy_str):
+            continue
+        cuidadores = _cuidadores_de(conn, c["bebe_id"])
+        if not cuidadores:
+            continue
+        nombre_bebe = _nombre_bebe(conn, c["bebe_id"])
+        html = _html_cita(nombre_bebe, c)
+        asunto = f"Mañana: cita de {nombre_bebe}"
+        procesadas += 1
+        exito_alguno = False
+        for cuidador in cuidadores:
+            if not cuidador.get("email"):
+                continue
+            if _enviar_correo(cuidador["email"], asunto, html):
+                enviados += 1
+                exito_alguno = True
+            else:
+                fallidos += 1
+        if exito_alguno:
+            _marcar_enviado(conn, "cita_avisos_enviados", "cita_id", c["id"], hoy_str)
+    return {"citas_procesadas": procesadas, "correos_enviados": enviados, "correos_fallidos": fallidos}
+
+
+def _enviar_recordatorios_medicamentos(conn, ventana_minutos=5):
+    ahora = datetime.now(BOGOTA_TZ)
+    hoy_str = ahora.date().isoformat()
+    medicamentos = conn.execute(
         """SELECT * FROM medicamentos WHERE activo = 1
            AND (fecha_inicio IS NULL OR fecha_inicio <= ?)
            AND (fecha_fin IS NULL OR fecha_fin >= ?)""",
         (hoy_str, hoy_str),
     ).fetchall()
 
-    por_bebe = {}
-    for r in citas_rows:
-        por_bebe.setdefault(r["bebe_id"], {"citas": [], "medicamentos": []})["citas"].append(dict(r))
-    for r in medicamentos_rows:
-        por_bebe.setdefault(r["bebe_id"], {"citas": [], "medicamentos": []})["medicamentos"].append(dict(r))
-
-    correos_enviados = 0
-    correos_fallidos = 0
-    bebes_procesados = 0
-
-    for bebe_id, info in por_bebe.items():
-        cuidadores = _cuidadores_de(conn, bebe_id)
+    enviados, fallidos, procesados = 0, 0, 0
+    for m in medicamentos:
+        m = dict(m)
+        if not m.get("hora"):
+            continue  # "Si no se pone hora no se notifique"
+        if not _en_ventana_30min_antes(m["hora"], ahora, ventana_minutos):
+            continue
+        if _ya_enviado(conn, "medicamento_avisos_enviados", "medicamento_id", m["id"], hoy_str):
+            continue
+        cuidadores = _cuidadores_de(conn, m["bebe_id"])
         if not cuidadores:
             continue
-        nombre_bebe = _nombre_bebe(conn, bebe_id)
-        html = _html_recordatorio(nombre_bebe, info["citas"], info["medicamentos"])
-        asunto = "Recordatorio de " + nombre_bebe
-        bebes_procesados += 1
+        nombre_bebe = _nombre_bebe(conn, m["bebe_id"])
+        html = _html_medicamento(nombre_bebe, m)
+        asunto = f"En 30 min: medicamento de {nombre_bebe}"
+        procesados += 1
+        exito_alguno = False
         for cuidador in cuidadores:
             if not cuidador.get("email"):
                 continue
             if _enviar_correo(cuidador["email"], asunto, html):
-                correos_enviados += 1
+                enviados += 1
+                exito_alguno = True
             else:
-                correos_fallidos += 1
+                fallidos += 1
+        if exito_alguno:
+            _marcar_enviado(conn, "medicamento_avisos_enviados", "medicamento_id", m["id"], hoy_str)
+    return {"medicamentos_procesados": procesados, "correos_enviados": enviados, "correos_fallidos": fallidos}
 
+
+@app.route("/api/tareas/enviar-alertas", methods=["POST"])
+def api_tareas_enviar_alertas():
+    """Dispara el envío de recordatorios. Protegido por un token secreto
+    (header X-Tarea-Token) — pensado para Cron Jobs de Render, no para el
+    navegador del usuario. ?tipo=citas o ?tipo=medicamentos corre solo esa
+    parte (son dos Cron Jobs con horarios distintos); sin ?tipo, corre ambas
+    (uso manual / pruebas)."""
+    token_recibido = request.headers.get("X-Tarea-Token", "")
+    if not TAREAS_SECRET_TOKEN or not secrets.compare_digest(token_recibido, TAREAS_SECRET_TOKEN):
+        return jsonify({"error": "no_autorizado"}), 401
+
+    tipo = request.args.get("tipo", "")
+    conn = get_db()
+    resultado = {"ok": True}
+    if tipo in ("", "citas"):
+        resultado["citas"] = _enviar_recordatorios_citas(conn)
+    if tipo in ("", "medicamentos"):
+        resultado["medicamentos"] = _enviar_recordatorios_medicamentos(conn)
     conn.close()
-    return jsonify({
-        "ok": True,
-        "bebes_procesados": bebes_procesados,
-        "correos_enviados": correos_enviados,
-        "correos_fallidos": correos_fallidos,
-    })
+    return jsonify(resultado)
 
 
 @app.route("/api/chat", methods=["POST"])
