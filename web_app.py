@@ -20,11 +20,14 @@ import os
 import json
 import base64
 import logging
+import secrets
 import sqlite3
+from datetime import date, timedelta
 from pathlib import Path
 from concurrent.futures import ThreadPoolExecutor
 
 from flask import Flask, request, jsonify, send_from_directory, session, redirect, url_for, Response, stream_with_context
+import requests
 import anthropic
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
@@ -328,6 +331,27 @@ DB_PATH = DB_DIR / "babymathew.db"
 
 GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID")
 GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
+
+# --- Recordatorios por correo (citas y medicamentos) ------------------------
+# Servicio: Resend (resend.com). RESEND_API_KEY y RESEND_FROM se configuran
+# como variables de entorno en Render. RESEND_FROM debe ser una dirección del
+# dominio verificado en Resend (ej. recordatorios@babymathewia.com).
+# TAREAS_SECRET_TOKEN protege /api/tareas/enviar-alertas: solo el Cron Job de
+# Render (que lo manda como header) puede disparar el envío. Genera uno con:
+#   python -c "import secrets; print(secrets.token_hex(32))"
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
+RESEND_FROM = os.environ.get("RESEND_FROM", "Baby Mathew IA <recordatorios@babymathewia.com>")
+TAREAS_SECRET_TOKEN = os.environ.get("TAREAS_SECRET_TOKEN")
+if not RESEND_API_KEY:
+    logger.warning(
+        "Falta la variable de entorno RESEND_API_KEY: los recordatorios por "
+        "correo de citas y medicamentos quedarán deshabilitados hasta que la configures."
+    )
+if not TAREAS_SECRET_TOKEN:
+    logger.warning(
+        "Falta la variable de entorno TAREAS_SECRET_TOKEN: /api/tareas/enviar-alertas "
+        "rechazará todas las solicitudes hasta que la configures."
+    )
 
 oauth = OAuth(app)
 GOOGLE_LOGIN_ENABLED = bool(GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET)
@@ -1013,6 +1037,148 @@ def api_medicamentos_delete(medicamento_id):
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# Recordatorios por correo: citas (día anterior) y medicamentos activos (hoy)
+# ---------------------------------------------------------------------------
+def _enviar_correo(destinatario, asunto, html):
+    """Envía un correo vía Resend. Devuelve True/False; nunca lanza excepción
+    hacia el llamador (un fallo de envío no debe tumbar el resto del job)."""
+    if not RESEND_API_KEY:
+        return False
+    try:
+        resp = requests.post(
+            "https://api.resend.com/emails",
+            headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
+            json={"from": RESEND_FROM, "to": [destinatario], "subject": asunto, "html": html},
+            timeout=15,
+        )
+        if resp.status_code >= 300:
+            logger.warning("Resend rechazó un correo a %s: %s %s", destinatario, resp.status_code, resp.text[:300])
+            return False
+        return True
+    except requests.RequestException as e:
+        logger.warning("Fallo de red enviando correo a %s: %s", destinatario, e)
+        return False
+
+
+def _cuidadores_de(conn, bebe_id):
+    """Emails + nombre de todos los cuidadores vinculados a un bebé."""
+    rows = conn.execute(
+        """SELECT u.email, u.name FROM bebe_cuidadores bc
+           JOIN users u ON u.id = bc.user_id WHERE bc.bebe_id = ?""",
+        (bebe_id,),
+    ).fetchall()
+    return [dict(r) for r in rows]
+
+
+def _nombre_bebe(conn, bebe_id):
+    row = conn.execute("SELECT nombre, etapa FROM bebes WHERE id = ?", (bebe_id,)).fetchone()
+    if not row:
+        return "tu bebé"
+    return row["nombre"] or ("tu bebé en camino" if row["etapa"] == "gestacion" else "tu bebé")
+
+
+def _html_recordatorio(nombre_bebe, citas, medicamentos):
+    partes = [
+        "<div style=\"font-family:'Source Sans 3',Arial,sans-serif;color:#173330;max-width:480px;margin:0 auto;\">",
+        "<h2 style=\"color:#2B6A67;\">Recordatorios de " + nombre_bebe + "</h2>",
+    ]
+    if citas:
+        partes.append("<h3 style=\"color:#2B6A67;font-size:1rem;\">📅 Cita médica mañana</h3>")
+        for c in citas:
+            linea = f"{c['especialidad']} — {c['fecha']}"
+            if c.get("hora"):
+                linea += f" a las {c['hora']}"
+            if c.get("lugar"):
+                linea += f"<br>Lugar: {c['lugar']}"
+            if c.get("medico"):
+                linea += f"<br>Con: {c['medico']}"
+            partes.append(f"<p style='background:#EAF6F4;border-radius:10px;padding:12px 14px;'>{linea}</p>")
+    if medicamentos:
+        partes.append("<h3 style=\"color:#2B6A67;font-size:1rem;\">💊 Medicamentos de hoy</h3>")
+        partes.append(
+            "<p style='font-size:.78rem;color:#5C7A76;'>Tal como lo registraste según indicación médica. "
+            "Baby Mathew IA no sugiere ni calcula dosis.</p>"
+        )
+        for m in medicamentos:
+            linea = f"{m['nombre']}"
+            if m.get("cantidad"):
+                linea += f" — {m['cantidad']}"
+            if m.get("hora"):
+                linea += f" a las {m['hora']}"
+            if m.get("frecuencia"):
+                linea += f"<br>Frecuencia: {m['frecuencia']}"
+            partes.append(f"<p style='background:#EAF6F4;border-radius:10px;padding:12px 14px;'>{linea}</p>")
+    partes.append(
+        "<p style='font-size:.72rem;color:#93ACA8;margin-top:20px;'>Baby Mathew IA · "
+        "Este correo es un recordatorio de lo que tú registraste, no un consejo médico.</p>"
+    )
+    partes.append("</div>")
+    return "".join(partes)
+
+
+@app.route("/api/tareas/enviar-alertas", methods=["POST"])
+def api_tareas_enviar_alertas():
+    """Dispara el envío diario de recordatorios. Protegido por un token
+    secreto (header X-Tarea-Token) — pensado para ser llamado por un Cron Job
+    de Render, no por el navegador del usuario."""
+    token_recibido = request.headers.get("X-Tarea-Token", "")
+    if not TAREAS_SECRET_TOKEN or not secrets.compare_digest(token_recibido, TAREAS_SECRET_TOKEN):
+        return jsonify({"error": "no_autorizado"}), 401
+
+    hoy = date.today()
+    manana = (hoy + timedelta(days=1)).isoformat()
+    hoy_str = hoy.isoformat()
+
+    conn = get_db()
+
+    citas_rows = conn.execute(
+        """SELECT * FROM citas WHERE estado = 'pendiente' AND avisarme = 1 AND fecha = ?""",
+        (manana,),
+    ).fetchall()
+
+    medicamentos_rows = conn.execute(
+        """SELECT * FROM medicamentos WHERE activo = 1
+           AND (fecha_inicio IS NULL OR fecha_inicio <= ?)
+           AND (fecha_fin IS NULL OR fecha_fin >= ?)""",
+        (hoy_str, hoy_str),
+    ).fetchall()
+
+    por_bebe = {}
+    for r in citas_rows:
+        por_bebe.setdefault(r["bebe_id"], {"citas": [], "medicamentos": []})["citas"].append(dict(r))
+    for r in medicamentos_rows:
+        por_bebe.setdefault(r["bebe_id"], {"citas": [], "medicamentos": []})["medicamentos"].append(dict(r))
+
+    correos_enviados = 0
+    correos_fallidos = 0
+    bebes_procesados = 0
+
+    for bebe_id, info in por_bebe.items():
+        cuidadores = _cuidadores_de(conn, bebe_id)
+        if not cuidadores:
+            continue
+        nombre_bebe = _nombre_bebe(conn, bebe_id)
+        html = _html_recordatorio(nombre_bebe, info["citas"], info["medicamentos"])
+        asunto = "Recordatorio de " + nombre_bebe
+        bebes_procesados += 1
+        for cuidador in cuidadores:
+            if not cuidador.get("email"):
+                continue
+            if _enviar_correo(cuidador["email"], asunto, html):
+                correos_enviados += 1
+            else:
+                correos_fallidos += 1
+
+    conn.close()
+    return jsonify({
+        "ok": True,
+        "bebes_procesados": bebes_procesados,
+        "correos_enviados": correos_enviados,
+        "correos_fallidos": correos_fallidos,
+    })
 
 
 @app.route("/api/chat", methods=["POST"])
