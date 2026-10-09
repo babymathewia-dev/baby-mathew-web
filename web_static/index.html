@@ -341,7 +341,7 @@
     </div>
   </div>
 
-  <audio id="sonidosMelodyAudio" loop preload="none" src="/audio/cancion_cuna.mp3"></audio>
+  <audio id="sonidosMelodyAudio" loop preload="none" src="/cancion_cuna.mp3"></audio>
   <audio id="sonidosNoiseAudio" loop preload="none"></audio>
 
   <header>
@@ -1936,9 +1936,9 @@
   // pantalla de bloqueo vía Media Session API -- con Web Audio puro ese
   // comportamiento es poco confiable en iPhone.
   var SONIDOS_NOISE_SRC = {
-    blanco: "/audio/ruido_blanco.mp3",
-    rosa: "/audio/ruido_rosa.mp3",
-    marron: "/audio/ruido_marron.mp3"
+    blanco: "/ruido_blanco.mp3",
+    rosa: "/ruido_rosa.mp3",
+    marron: "/ruido_marron.mp3"
   };
   var sonidosState = {
     noiseType: "rosa",   // blanco | rosa | marron | ninguno
