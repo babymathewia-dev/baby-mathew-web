@@ -331,6 +331,19 @@
     </div>
   </div>
 
+  <div id="sonidosOverlay" class="modalOverlay hidden">
+    <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="sonidosModalTitle">
+      <div class="modalHeader">
+        <h2 id="sonidosModalTitle">Sonidos para dormir</h2>
+        <button type="button" class="modalCloseBtn" id="sonidosCloseBtn" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></button>
+      </div>
+      <div class="modalBody" id="sonidosModalBody"></div>
+    </div>
+  </div>
+
+  <audio id="sonidosMelodyAudio" loop preload="none" src="/audio/cancion_cuna.mp3"></audio>
+  <audio id="sonidosNoiseAudio" loop preload="none"></audio>
+
   <header>
     <img src="/logo.jpg" alt="Baby Mathew">
     <div class="titleBlock">
@@ -397,6 +410,10 @@
         <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
         Agenda
       </button>
+      <button type="button" class="more-menu-item" id="menuSonidos" role="menuitem">
+        <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
+        Sonidos para dormir
+      </button>
       <a href="https://www.tiktok.com/@baby.mathew.ia" target="_blank" rel="noopener" class="more-menu-item" id="menuTikTok" role="menuitem">
         <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.6 5.82c-.84-.73-1.38-1.77-1.5-2.93h-3.03v13.44a3.03 3.03 0 1 1-2.14-2.9V10.3a6.1 6.1 0 1 0 5.17 6.03V9.57a8.13 8.13 0 0 0 4.75 1.53V8.07c-1.19 0-2.3-.4-3.25-1.08l0 0z"/></svg></span>
         Síguenos en TikTok
@@ -446,6 +463,12 @@
   var contactOverlay = document.getElementById("contactOverlay");
   var contactModalBody = document.getElementById("contactModalBody");
   var contactCloseBtn = document.getElementById("contactCloseBtn");
+  var menuSonidos = document.getElementById("menuSonidos");
+  var sonidosOverlay = document.getElementById("sonidosOverlay");
+  var sonidosModalBody = document.getElementById("sonidosModalBody");
+  var sonidosCloseBtn = document.getElementById("sonidosCloseBtn");
+  var sonidosMelodyAudio = document.getElementById("sonidosMelodyAudio");
+  var sonidosNoiseAudio = document.getElementById("sonidosNoiseAudio");
 
   var DISCLAIMER_LOCAL = "Soy un asistente informativo, no un profesional de la salud. No diagnostico ni prescribo. Ante cualquier duda urgente, contacta siempre a tu médico o acude a urgencias. Puedes adjuntar hasta 5 documentos o fotos (PDF, imágenes o texto) con el ícono 📎; los uso solo para responder tu pregunta, no quedan guardados. Tu conversación se guarda únicamente en este navegador para que puedas continuarla luego — no se envía a nadie más ni queda en nuestros servidores.";
   var DISCLAIMER_LOGGED_IN = "Soy un asistente informativo, no un profesional de la salud. No diagnostico ni prescribo. Ante cualquier duda urgente, contacta siempre a tu médico o acude a urgencias. Puedes adjuntar hasta 5 documentos o fotos (PDF, imágenes o texto) con el ícono 📎; los uso solo para responder tu pregunta, no quedan guardados. Tu conversación se guarda en tu cuenta para que puedas continuarla luego desde cualquier dispositivo.";
@@ -1905,6 +1928,170 @@
   menuAgenda.addEventListener("click", function(){ closeMoreMenuAnd(openAgendaModal); });
   agendaCloseBtn.addEventListener("click", function(){ limpiarFab(); agendaOverlay.classList.add("hidden"); });
   agendaOverlay.addEventListener("click", function(ev){ if (ev.target === agendaOverlay) { limpiarFab(); agendaOverlay.classList.add("hidden"); } });
+
+  // --- Sonidos para dormir: ruido blanco/rosa/marrón + canción de cuna ---
+  // Todo se reproduce con elementos <audio> reales (no Web Audio API en
+  // vivo) a propósito: es lo que de forma confiable sigue sonando con la
+  // pantalla del celular bloqueada y permite mostrar controles en la
+  // pantalla de bloqueo vía Media Session API -- con Web Audio puro ese
+  // comportamiento es poco confiable en iPhone.
+  var SONIDOS_NOISE_SRC = {
+    blanco: "/audio/ruido_blanco.mp3",
+    rosa: "/audio/ruido_rosa.mp3",
+    marron: "/audio/ruido_marron.mp3"
+  };
+  var sonidosState = {
+    noiseType: "rosa",   // blanco | rosa | marron | ninguno
+    melodyOn: true,
+    playing: false,
+    timerMinutes: 0,     // 0 = sin límite (toda la noche)
+    timerHandle: null,
+    countdownHandle: null,
+    endsAt: null
+  };
+
+  function sonidosDetener(){
+    sonidosState.playing = false;
+    sonidosMelodyAudio.pause();
+    sonidosNoiseAudio.pause();
+    if (sonidosState.timerHandle) { clearTimeout(sonidosState.timerHandle); sonidosState.timerHandle = null; }
+    if (sonidosState.countdownHandle) { clearInterval(sonidosState.countdownHandle); sonidosState.countdownHandle = null; }
+    sonidosState.endsAt = null;
+    try { if (navigator.mediaSession) navigator.mediaSession.playbackState = "paused"; } catch (e) {}
+  }
+
+  function sonidosActualizarEstadoUI(){
+    var playBtn = document.getElementById("sonidosPlayBtn");
+    var statusEl = document.getElementById("sonidosStatus");
+    if (!playBtn) return;
+    playBtn.textContent = sonidosState.playing ? "Pausar" : "Reproducir";
+    if (!statusEl) return;
+    if (!sonidosState.playing) {
+      statusEl.textContent = "";
+    } else if (!sonidosState.endsAt) {
+      statusEl.textContent = "Sonando — toda la noche (sin límite)";
+    } else {
+      var msLeft = sonidosState.endsAt - Date.now();
+      var minLeft = Math.max(0, Math.ceil(msLeft / 60000));
+      statusEl.textContent = "Sonando — se detiene en " + minLeft + " min";
+    }
+  }
+
+  function sonidosIniciar(){
+    sonidosState.playing = true;
+    if (sonidosState.noiseType !== "ninguno") {
+      var src = SONIDOS_NOISE_SRC[sonidosState.noiseType];
+      if (sonidosNoiseAudio.getAttribute("src") !== src) sonidosNoiseAudio.setAttribute("src", src);
+      sonidosNoiseAudio.volume = sonidosState.melodyOn ? 0.55 : 0.8;
+      sonidosNoiseAudio.play().catch(function(){});
+    } else {
+      sonidosNoiseAudio.pause();
+    }
+    if (sonidosState.melodyOn) {
+      sonidosMelodyAudio.volume = 0.8;
+      sonidosMelodyAudio.play().catch(function(){});
+    } else {
+      sonidosMelodyAudio.pause();
+    }
+
+    try {
+      if ("mediaSession" in navigator) {
+        navigator.mediaSession.metadata = new MediaMetadata({
+          title: "Sonidos para dormir",
+          artist: "Baby Mathew IA",
+          artwork: [{ src: "/logo.jpg", sizes: "512x512", type: "image/jpeg" }]
+        });
+        navigator.mediaSession.playbackState = "playing";
+        navigator.mediaSession.setActionHandler("play", function(){ sonidosIniciar(); sonidosActualizarEstadoUI(); });
+        navigator.mediaSession.setActionHandler("pause", function(){ sonidosDetener(); sonidosActualizarEstadoUI(); });
+        navigator.mediaSession.setActionHandler("stop", function(){ sonidosDetener(); sonidosActualizarEstadoUI(); });
+      }
+    } catch (e) { /* Media Session no disponible en este navegador */ }
+
+    if (sonidosState.timerHandle) clearTimeout(sonidosState.timerHandle);
+    if (sonidosState.countdownHandle) clearInterval(sonidosState.countdownHandle);
+    if (sonidosState.timerMinutes > 0) {
+      sonidosState.endsAt = Date.now() + sonidosState.timerMinutes * 60000;
+      sonidosState.timerHandle = setTimeout(function(){
+        sonidosDetener();
+        sonidosActualizarEstadoUI();
+      }, sonidosState.timerMinutes * 60000);
+      sonidosState.countdownHandle = setInterval(sonidosActualizarEstadoUI, 30000);
+    } else {
+      sonidosState.endsAt = null;
+    }
+  }
+
+  function renderSonidosPanel(){
+    var noiseOptions = [
+      { id: "blanco", label: "Blanco" },
+      { id: "rosa", label: "Rosa" },
+      { id: "marron", label: "Marrón" },
+      { id: "ninguno", label: "Sin ruido" }
+    ];
+    var timerOptions = [
+      { min: 15, label: "15 min" },
+      { min: 30, label: "30 min" },
+      { min: 60, label: "60 min" },
+      { min: 0, label: "Toda la noche" }
+    ];
+
+    var noiseBtnsHtml = noiseOptions.map(function(o){
+      return '<button type="button" class="sonidosNoiseBtn' + (sonidosState.noiseType === o.id ? ' active' : '') +
+        '" data-noise="' + o.id + '">' + o.label + '</button>';
+    }).join("");
+
+    var timerBtnsHtml = timerOptions.map(function(o){
+      return '<button type="button" class="sonidosTimerBtn' + (sonidosState.timerMinutes === o.min ? ' active' : '') +
+        '" data-min="' + o.min + '">' + o.label + '</button>';
+    }).join("");
+
+    sonidosModalBody.innerHTML =
+      '<p style="margin:0 0 14px; font-size:.82rem; color:var(--text-muted);">' +
+      'Ruido de fondo y una canción de cuna suave, pensados para sonar toda la noche. ' +
+      'Sigue sonando con la pantalla bloqueada.</p>' +
+      '<div class="fld"><label>Ruido de fondo</label><div class="stageToggle" id="sonidosNoiseToggle">' + noiseBtnsHtml + '</div></div>' +
+      '<div class="toggleRow" id="sonidosMelodyRow">' +
+      '<div class="txt"><p>Canción de cuna</p><small>Melodía tipo caja de música, en loop</small></div>' +
+      '<button type="button" class="toggleSwitch' + (sonidosState.melodyOn ? ' on' : '') + '" id="sonidosMelodyToggle" aria-pressed="' + sonidosState.melodyOn + '"><span class="knob"></span></button>' +
+      '</div>' +
+      '<div class="fld"><label>Apagar automáticamente</label><div class="stageToggle" id="sonidosTimerToggle">' + timerBtnsHtml + '</div></div>' +
+      '<p id="sonidosStatus" style="margin:0 0 10px; font-size:.78rem; color:var(--primary-dark); font-weight:700;"></p>' +
+      '<button type="button" class="btnPrimary" id="sonidosPlayBtn">Reproducir</button>';
+
+    document.getElementById("sonidosNoiseToggle").addEventListener("click", function(ev){
+      var btn = ev.target.closest(".sonidosNoiseBtn");
+      if (!btn) return;
+      sonidosState.noiseType = btn.getAttribute("data-noise");
+      if (sonidosState.playing) sonidosIniciar();
+      renderSonidosPanel();
+    });
+
+    document.getElementById("sonidosMelodyToggle").addEventListener("click", function(){
+      sonidosState.melodyOn = !sonidosState.melodyOn;
+      if (sonidosState.playing) sonidosIniciar();
+      renderSonidosPanel();
+    });
+
+    document.getElementById("sonidosTimerToggle").addEventListener("click", function(ev){
+      var btn = ev.target.closest(".sonidosTimerBtn");
+      if (!btn) return;
+      sonidosState.timerMinutes = parseInt(btn.getAttribute("data-min"), 10);
+      if (sonidosState.playing) sonidosIniciar();
+      renderSonidosPanel();
+    });
+
+    document.getElementById("sonidosPlayBtn").addEventListener("click", function(){
+      if (sonidosState.playing) { sonidosDetener(); } else { sonidosIniciar(); }
+      sonidosActualizarEstadoUI();
+    });
+
+    sonidosActualizarEstadoUI();
+  }
+
+  menuSonidos.addEventListener("click", function(){ closeMoreMenuAnd(function(){ renderSonidosPanel(); sonidosOverlay.classList.remove("hidden"); }); });
+  sonidosCloseBtn.addEventListener("click", function(){ sonidosOverlay.classList.add("hidden"); });
+  sonidosOverlay.addEventListener("click", function(ev){ if (ev.target === sonidosOverlay) sonidosOverlay.classList.add("hidden"); });
 
   (async function init(){
     var me = { logged_in: false };
