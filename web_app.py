@@ -22,6 +22,7 @@ import base64
 import logging
 import secrets
 import sqlite3
+from html import escape as _escape_html
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 from pathlib import Path
@@ -342,6 +343,8 @@ GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET")
 #   python -c "import secrets; print(secrets.token_hex(32))"
 RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
 RESEND_FROM = os.environ.get("RESEND_FROM", "Baby Mathew IA <recordatorios@babymathewia.com>")
+# Bandeja donde caen los mensajes del formulario de "Contáctenos".
+CONTACTO_DESTINO = os.environ.get("CONTACTO_EMAIL", "Baby.mathew.ia@gmail.com")
 TAREAS_SECRET_TOKEN = os.environ.get("TAREAS_SECRET_TOKEN")
 if not RESEND_API_KEY:
     logger.warning(
@@ -598,6 +601,7 @@ def auth_callback():
     session["user_id"] = user_id
     session["name"] = name
     session["picture"] = picture
+    session["email"] = email
     return redirect("/")
 
 
@@ -622,6 +626,7 @@ def api_me():
         "logged_in": True,
         "name": session.get("name"),
         "picture": session.get("picture"),
+        "email": session.get("email"),
         "google_login_enabled": GOOGLE_LOGIN_ENABLED,
         "terms_accepted": terms_accepted,
         "terms_version": TERMS_VERSION,
@@ -643,6 +648,45 @@ def api_accept_terms():
     conn.commit()
     conn.close()
     return jsonify({"ok": True, "stored": "account", "terms_version": TERMS_VERSION})
+
+
+@app.route("/api/contacto", methods=["POST"])
+@limiter.limit("5 per hour")
+def api_contacto():
+    """Formulario de 'Contáctenos': asunto + descripción, llega por correo
+    a CONTACTO_DESTINO con reply-to al remitente para poder responderle
+    directo."""
+    data = request.get_json(silent=True) or {}
+    asunto = (data.get("asunto") or "").strip()[:150]
+    descripcion = (data.get("descripcion") or "").strip()[:5000]
+    if not asunto or not descripcion:
+        return jsonify({"error": "faltan_campos"}), 400
+
+    if "user_id" in session and session.get("email"):
+        remitente_email = session["email"]
+        remitente_nombre = session.get("name") or remitente_email
+    else:
+        remitente_email = (data.get("email") or "").strip()[:200]
+        remitente_nombre = remitente_email
+
+    if not remitente_email or "@" not in remitente_email:
+        return jsonify({"error": "correo_invalido"}), 400
+
+    cuerpo_html = (
+        f"<p><strong>De:</strong> {_escape_html(remitente_nombre)} "
+        f"({_escape_html(remitente_email)})</p>"
+        f"<p><strong>Asunto:</strong> {_escape_html(asunto)}</p>"
+        f"<p><strong>Descripción:</strong><br>{_escape_html(descripcion).replace(chr(10), '<br>')}</p>"
+    )
+    enviado = _enviar_correo(
+        CONTACTO_DESTINO,
+        f"[Baby Mathew IA · Contacto] {asunto}",
+        cuerpo_html,
+        reply_to=remitente_email,
+    )
+    if not enviado:
+        return jsonify({"ok": False, "error": "envio_fallido"}), 502
+    return jsonify({"ok": True})
 
 
 @app.route("/api/history", methods=["GET"])
@@ -1116,16 +1160,21 @@ def _marcar_enviado(conn, tabla, columna_id, item_id, fecha_envio):
         pass  # ya estaba marcado (carrera entre corridas) -- no es un error
 
 
-def _enviar_correo(destinatario, asunto, html):
+def _enviar_correo(destinatario, asunto, html, reply_to=None):
     """Envía un correo vía Resend. Devuelve True/False; nunca lanza excepción
-    hacia el llamador (un fallo de envío no debe tumbar el resto del job)."""
+    hacia el llamador (un fallo de envío no debe tumbar el resto del job).
+    reply_to (opcional): para que al responder el correo, la respuesta vaya
+    directo a esa dirección en vez de a RESEND_FROM."""
     if not RESEND_API_KEY:
         return False
     try:
+        payload = {"from": RESEND_FROM, "to": [destinatario], "subject": asunto, "html": html}
+        if reply_to:
+            payload["reply_to"] = [reply_to]
         resp = requests.post(
             "https://api.resend.com/emails",
             headers={"Authorization": f"Bearer {RESEND_API_KEY}"},
-            json={"from": RESEND_FROM, "to": [destinatario], "subject": asunto, "html": html},
+            json=payload,
             timeout=15,
         )
         if resp.status_code >= 300:
