@@ -1587,7 +1587,16 @@
     h3.textContent = "Nueva cita";
     agendaContentEl.appendChild(h3);
 
-    agendaContentEl.innerHTML += ""
+    // Nota: todo lo que va en agendaContentEl a partir de aquí usa
+    // insertAdjacentHTML (no "innerHTML +="). "innerHTML +=" serializa y
+    // vuelve a parsear TODO el contenido existente, lo que destruye
+    // cualquier nodo ya creado con addEventListener (como el botón del
+    // toggle de abajo) y lo reemplaza por una copia visualmente idéntica
+    // pero sin el evento -- ese era el bug real: el switch "Avisarme antes"
+    // se veía pero no respondía al clic porque un innerHTML += posterior
+    // (el de Notas) borraba su listener. insertAdjacentHTML("beforeend", …)
+    // en cambio solo agrega nodos nuevos al final, sin tocar los existentes.
+    agendaContentEl.insertAdjacentHTML("beforeend", ""
       + "<div class=\"fld\"><label for=\"cEspecialidad\">Especialidad</label>"
       + "<select id=\"cEspecialidad\"><option>Pediatría (control)</option><option>Ginecología (control prenatal)</option><option>Materno Fetal</option><option>Psicología</option><option>Vacunas</option><option>Nutrición</option><option>Estimulación temprana</option><option>Lactancia</option><option>Odontología pediátrica</option><option>Otra</option></select></div>"
       + "<div class=\"fldRow\">"
@@ -1596,7 +1605,7 @@
       + "</div>"
       + "<div class=\"fld\"><label for=\"cLugar\">Lugar</label><input id=\"cLugar\" type=\"text\" placeholder=\"Ej. IPS Vida Envigado\"></div>"
       + "<div class=\"fld\"><label for=\"cMedico\">Nombre del médico o profesional</label><input id=\"cMedico\" type=\"text\" placeholder=\"Ej. Dra. Laura Gómez\"></div>"
-      + "<div class=\"fld\"><label for=\"cValor\">Valor (COP)</label><input id=\"cValor\" type=\"text\" placeholder=\"Ej. 85.000\"></div>";
+      + "<div class=\"fld\"><label for=\"cValor\">Valor (COP)</label><input id=\"cValor\" type=\"text\" placeholder=\"Ej. 85.000\"></div>");
 
     var toggleRow = document.createElement("div");
     toggleRow.className = "toggleRow";
@@ -1613,8 +1622,8 @@
     toggleRow.appendChild(toggleBtn);
     agendaContentEl.appendChild(toggleRow);
 
-    agendaContentEl.innerHTML += "<div class=\"fld\"><label for=\"cNotas\">Notas (opcional)</label>"
-      + "<textarea id=\"cNotas\" rows=\"3\" placeholder=\"Recomendaciones, medicamentos formulados...\"></textarea></div>";
+    agendaContentEl.insertAdjacentHTML("beforeend", "<div class=\"fld\"><label for=\"cNotas\">Notas (opcional)</label>"
+      + "<textarea id=\"cNotas\" rows=\"3\" placeholder=\"Recomendaciones, medicamentos formulados...\"></textarea></div>");
 
     var btnRow = document.createElement("div");
     btnRow.className = "btnRow";
