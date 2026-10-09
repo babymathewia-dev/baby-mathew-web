@@ -321,6 +321,16 @@
     </div>
   </div>
 
+  <div id="contactOverlay" class="modalOverlay hidden">
+    <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="contactModalTitle">
+      <div class="modalHeader">
+        <h2 id="contactModalTitle">Contáctenos</h2>
+        <button type="button" class="modalCloseBtn" id="contactCloseBtn" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></button>
+      </div>
+      <div class="modalBody" id="contactModalBody"></div>
+    </div>
+  </div>
+
   <header>
     <img src="/logo.jpg" alt="Baby Mathew">
     <div class="titleBlock">
@@ -329,9 +339,9 @@
     </div>
 
     <div id="authArea">
-      <a id="contactBtn" href="mailto:Baby.mathew.ia@gmail.com" class="iconBtn round" aria-label="Contáctenos" title="Contáctenos: Baby.mathew.ia@gmail.com">
+      <button id="contactBtn" type="button" class="iconBtn round" aria-label="Contáctenos" title="Contáctenos">
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></svg>
-      </a>
+      </button>
       <button id="loginBtn" type="button" class="iconBtn round" aria-label="Iniciar sesión con Google" title="Iniciar sesión con Google">
         <svg width="18" height="18" viewBox="0 0 18 18" aria-hidden="true">
           <path fill="#4285F4" d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.874 2.684-6.615z"/>
@@ -432,10 +442,16 @@
   var agendaOverlay = document.getElementById("agendaOverlay");
   var agendaModalBody = document.getElementById("agendaModalBody");
   var agendaCloseBtn = document.getElementById("agendaCloseBtn");
+  var contactBtn = document.getElementById("contactBtn");
+  var contactOverlay = document.getElementById("contactOverlay");
+  var contactModalBody = document.getElementById("contactModalBody");
+  var contactCloseBtn = document.getElementById("contactCloseBtn");
 
   var DISCLAIMER_LOCAL = "Soy un asistente informativo, no un profesional de la salud. No diagnostico ni prescribo. Ante cualquier duda urgente, contacta siempre a tu médico o acude a urgencias. Puedes adjuntar hasta 5 documentos o fotos (PDF, imágenes o texto) con el ícono 📎; los uso solo para responder tu pregunta, no quedan guardados. Tu conversación se guarda únicamente en este navegador para que puedas continuarla luego — no se envía a nadie más ni queda en nuestros servidores.";
   var DISCLAIMER_LOGGED_IN = "Soy un asistente informativo, no un profesional de la salud. No diagnostico ni prescribo. Ante cualquier duda urgente, contacta siempre a tu médico o acude a urgencias. Puedes adjuntar hasta 5 documentos o fotos (PDF, imágenes o texto) con el ícono 📎; los uso solo para responder tu pregunta, no quedan guardados. Tu conversación se guarda en tu cuenta para que puedas continuarla luego desde cualquier dispositivo.";
   var loggedIn = false;
+  var currentUserEmail = "";
+  var currentUserName = "";
 
   var STORAGE_KEY = "babymathew_chat_v1";
   var turns = [];
@@ -1064,6 +1080,8 @@
 
   function applyAuthUI(me){
     loggedIn = !!me.logged_in;
+    currentUserEmail = (loggedIn && me.email) ? me.email : "";
+    currentUserName = (loggedIn && me.name) ? me.name : "";
     if (loggedIn) {
       loginBtn.style.display = "none";
       userChip.classList.add("visible");
@@ -1078,6 +1096,71 @@
       disclaimerText.innerHTML = "<strong>Aviso.</strong> " + DISCLAIMER_LOCAL;
     }
   }
+
+  // --- Formulario "Contáctenos" ---------------------------------------
+  function renderContactForm(){
+    var emailFieldHtml = currentUserEmail
+      ? '<div class="fld"><label>Tu correo</label><input type="email" id="contactEmail" value="' +
+        currentUserEmail.replace(/"/g, "&quot;") + '" readonly></div>'
+      : '<div class="fld"><label>Tu correo</label><input type="email" id="contactEmail" placeholder="tucorreo@ejemplo.com" required></div>';
+
+    contactModalBody.innerHTML =
+      '<p style="margin:0 0 14px; font-size:.82rem; color:var(--text-muted);">' +
+      'Cuéntanos tu comentario, duda o propuesta. Tu mensaje llega a nuestra bandeja de ' +
+      'revisión y te responderemos a este mismo correo.</p>' +
+      emailFieldHtml +
+      '<div class="fld"><label>Asunto</label><input type="text" id="contactAsunto" maxlength="150" placeholder="Ej: Propuesta de alianza" required></div>' +
+      '<div class="fld"><label>Descripción</label><textarea id="contactDescripcion" rows="5" maxlength="5000" placeholder="Escribe aquí tu mensaje..." required></textarea></div>' +
+      '<p id="contactMsg" style="margin:0 0 10px; font-size:.78rem;"></p>' +
+      '<button type="button" class="btnPrimary" id="contactSendBtn">Enviar</button>';
+
+    var sendBtn = document.getElementById("contactSendBtn");
+    var msgEl = document.getElementById("contactMsg");
+    sendBtn.addEventListener("click", async function(){
+      var emailEl = document.getElementById("contactEmail");
+      var asunto = document.getElementById("contactAsunto").value.trim();
+      var descripcion = document.getElementById("contactDescripcion").value.trim();
+      var email = emailEl ? emailEl.value.trim() : "";
+
+      if (!email || email.indexOf("@") === -1) {
+        msgEl.textContent = "Ingresa un correo válido.";
+        msgEl.style.color = "var(--danger-text)";
+        return;
+      }
+      if (!asunto || !descripcion) {
+        msgEl.textContent = "Completa el asunto y la descripción.";
+        msgEl.style.color = "var(--danger-text)";
+        return;
+      }
+      sendBtn.disabled = true;
+      sendBtn.textContent = "Enviando...";
+      msgEl.textContent = "";
+      try {
+        var res = await fetch("/api/contacto", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: email, asunto: asunto, descripcion: descripcion })
+        });
+        if (!res.ok) throw new Error("fallo");
+        contactModalBody.innerHTML =
+          '<p style="margin:0; font-size:.88rem; color:var(--text);">' +
+          '¡Gracias! Tu mensaje llegó a nuestra bandeja de revisión y te responderemos a ' +
+          (email.replace(/</g, "&lt;")) + '.</p>';
+      } catch (e) {
+        sendBtn.disabled = false;
+        sendBtn.textContent = "Enviar";
+        msgEl.textContent = "No se pudo enviar. Intenta de nuevo en un momento.";
+        msgEl.style.color = "var(--danger-text)";
+      }
+    });
+  }
+
+  contactBtn.addEventListener("click", function(){
+    renderContactForm();
+    contactOverlay.classList.remove("hidden");
+  });
+  contactCloseBtn.addEventListener("click", function(){ contactOverlay.classList.add("hidden"); });
+  contactOverlay.addEventListener("click", function(ev){ if (ev.target === contactOverlay) contactOverlay.classList.add("hidden"); });
 
   (function initDisclaimerDismiss(){
     try {
