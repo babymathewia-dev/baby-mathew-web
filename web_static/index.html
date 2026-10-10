@@ -153,8 +153,13 @@
   }
   .attachChip button{border:none;background:none;color:var(--text-muted);cursor:pointer;font-size:1rem;line-height:1;padding:0 2px;}
   .msg .att{display:block;font-size:.78rem;opacity:.8;margin-bottom:4px;}
-  .copyBtn{display:block;margin-top:9px;border:none;background:none;color:var(--text-muted);font-size:.74rem;cursor:pointer;padding:0;text-decoration:underline;}
-  .copyBtn:hover{color:var(--primary-dark);}
+  /* Fila de iconos (copiar / minimizar / compartir) en la esquina inferior
+     derecha de cada burbuja — ver addMessageOptions(). */
+  .msgOptions{display:flex;align-items:center;justify-content:flex-end;gap:2px;margin-top:8px;}
+  .msgOptBtn{display:flex;align-items:center;justify-content:center;width:26px;height:26px;padding:0;border:none;background:none;border-radius:50%;color:var(--text-muted);cursor:pointer;flex:0 0 auto;}
+  .msgOptBtn:hover{background:var(--surface-alt);color:var(--primary-dark);}
+  .msg.user .msgOptBtn{color:rgba(255,255,255,.75);}
+  .msg.user .msgOptBtn:hover{background:rgba(255,255,255,.18);color:#fff;}
   .verMasBtn{
     display:inline-flex; align-items:center; gap:5px; margin-top:7px;
     border:1px solid var(--border); background:var(--surface-alt); color:var(--primary-dark);
@@ -656,24 +661,81 @@
     } catch (e) { done(false); }
   }
 
-  function addCopyButton(el, rawText){
-    var btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "copyBtn";
-    btn.textContent = "Copiar";
-    btn.addEventListener("click", function(){
-      var text = toPlainText(rawText);
-      function done(ok){
-        btn.textContent = ok ? "¡Copiado!" : "No se pudo copiar";
-        setTimeout(function(){ btn.textContent = "Copiar"; }, 1500);
-      }
-      if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(text).then(function(){ done(true); }, function(){ fallbackCopy(text, done); });
-      } else {
-        fallbackCopy(text, done);
-      }
+  // Iconos de la fila de "opciones de mensaje" (ver addMessageOptions).
+  var MSGOPT_ICON_COPY = "<svg viewBox=\"0 0 24 24\" width=\"15\" height=\"15\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><rect x=\"9\" y=\"9\" width=\"13\" height=\"13\" rx=\"2\"/><path d=\"M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1\"/></svg>";
+  var MSGOPT_ICON_CHECK = "<svg viewBox=\"0 0 24 24\" width=\"15\" height=\"15\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.4\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><polyline points=\"20 6 9 17 4 12\"/></svg>";
+  var MSGOPT_ICON_MINIMIZE = "<svg viewBox=\"0 0 24 24\" width=\"15\" height=\"15\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2.3\" stroke-linecap=\"round\"><line x1=\"5\" y1=\"12\" x2=\"19\" y2=\"12\"/></svg>";
+  var MSGOPT_ICON_SHARE = "<svg viewBox=\"0 0 24 24\" width=\"15\" height=\"15\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 12v6a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-6\"/><polyline points=\"16 6 12 2 8 6\"/><line x1=\"12\" y1=\"2\" x2=\"12\" y2=\"15\"/></svg>";
+
+  function copiarAlPortapapeles(text, done){
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function(){ done(true); }, function(){ fallbackCopy(text, done); });
+    } else {
+      fallbackCopy(text, done);
+    }
+  }
+
+  // Fila de iconos en la esquina inferior derecha de cada mensaje: copiar
+  // siempre; minimizar solo si el mensaje viene de una vista previa expandida
+  // (cfg.onMinimize); compartir (hoja nativa del celular — WhatsApp,
+  // Instagram, etc., vía Web Share API) solo si cfg.allowShare es true. Los
+  // mensajes del usuario solo llevan copiar (ver addMessage).
+  function addMessageOptions(el, cfg){
+    var wrap = document.createElement("div");
+    wrap.className = "msgOptions";
+
+    var copyBtn = document.createElement("button");
+    copyBtn.type = "button";
+    copyBtn.className = "msgOptBtn";
+    copyBtn.setAttribute("aria-label", "Copiar");
+    copyBtn.title = "Copiar";
+    copyBtn.innerHTML = MSGOPT_ICON_COPY;
+    copyBtn.addEventListener("click", function(){
+      copiarAlPortapapeles(toPlainText(cfg.getText()), function(ok){
+        copyBtn.innerHTML = ok ? MSGOPT_ICON_CHECK : MSGOPT_ICON_COPY;
+        copyBtn.title = ok ? "¡Copiado!" : "No se pudo copiar";
+        setTimeout(function(){ copyBtn.innerHTML = MSGOPT_ICON_COPY; copyBtn.title = "Copiar"; }, 1300);
+      });
     });
-    el.appendChild(btn);
+    wrap.appendChild(copyBtn);
+
+    if (cfg.onMinimize) {
+      var minBtn = document.createElement("button");
+      minBtn.type = "button";
+      minBtn.className = "msgOptBtn";
+      minBtn.setAttribute("aria-label", "Minimizar");
+      minBtn.title = "Minimizar";
+      minBtn.innerHTML = MSGOPT_ICON_MINIMIZE;
+      minBtn.addEventListener("click", cfg.onMinimize);
+      wrap.appendChild(minBtn);
+    }
+
+    if (cfg.allowShare) {
+      var shareBtn = document.createElement("button");
+      shareBtn.type = "button";
+      shareBtn.className = "msgOptBtn";
+      shareBtn.setAttribute("aria-label", "Compartir");
+      shareBtn.title = "Compartir";
+      shareBtn.innerHTML = MSGOPT_ICON_SHARE;
+      shareBtn.addEventListener("click", function(){
+        var text = toPlainText(cfg.getText());
+        if (navigator.share) {
+          navigator.share({ text: text }).catch(function(){ /* el usuario canceló o el dispositivo no pudo abrir el panel — no hace falta avisar */ });
+        } else {
+          // Sin hoja nativa de compartir (navegador de escritorio, por ejemplo):
+          // se copia como respaldo para que el botón nunca quede sin efecto.
+          copiarAlPortapapeles(text, function(ok){
+            shareBtn.innerHTML = ok ? MSGOPT_ICON_CHECK : MSGOPT_ICON_SHARE;
+            shareBtn.title = ok ? "¡Copiado!" : "No se pudo compartir";
+            setTimeout(function(){ shareBtn.innerHTML = MSGOPT_ICON_SHARE; shareBtn.title = "Compartir"; }, 1300);
+          });
+        }
+      });
+      wrap.appendChild(shareBtn);
+    }
+
+    el.appendChild(wrap);
+    return wrap;
   }
 
   // Botones de 👍/👎 bajo una respuesta del bot, para medir qué respuestas
@@ -718,13 +780,28 @@
   // recibido, sin ninguna llamada nueva al servidor, así que no hay demora
   // ni se pierde contenido). Si el texto ya es corto, se muestra completo
   // de una vez, como antes.
-  function renderBotFinal(botEl, fullText){
-    var preview = buildPreview(fullText);
-    if (!preview) {
-      botEl.innerHTML = renderMarkdownLite(fullText);
-      addCopyButton(botEl, fullText);
-      return;
-    }
+  //
+  // textProvider es una función que devuelve el texto más reciente (en vez
+  // de un string fijo) para que, durante el streaming en vivo, "Ver
+  // respuesta completa" siempre tome lo último recibido hasta ese momento.
+  // cameFromPreview indica si este estado "completo" se alcanzó expandiendo
+  // una vista previa — solo ahí tiene sentido ofrecer "minimizar" (volver a
+  // la vista previa).
+  function renderBotFull(botEl, textProvider, cameFromPreview){
+    var full = textProvider();
+    botEl.innerHTML = renderMarkdownLite(full);
+    addMessageOptions(botEl, {
+      getText: textProvider,
+      allowShare: true,
+      onMinimize: cameFromPreview ? function(){
+        renderBotPreview(botEl, textProvider);
+        scrollToStart(botEl);
+      } : null
+    });
+  }
+
+  function renderBotPreview(botEl, textProvider){
+    var preview = buildPreview(textProvider()) || textProvider();
     botEl.innerHTML = renderMarkdownLite(preview);
     var btn = document.createElement("button");
     btn.type = "button";
@@ -732,36 +809,27 @@
     btn.innerHTML = "Ver respuesta completa "
       + "<svg viewBox=\"0 0 12 12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"><path d=\"M2.5 4.5 6 8l3.5-3.5\"/></svg>";
     btn.addEventListener("click", function(){
-      botEl.innerHTML = renderMarkdownLite(fullText);
-      addCopyButton(botEl, fullText);
+      renderBotFull(botEl, textProvider, true);
       scrollToStart(botEl);
     });
     botEl.appendChild(btn);
   }
 
+  function renderBotFinal(botEl, fullText){
+    var textProvider = function(){ return fullText; };
+    if (!buildPreview(fullText)) {
+      renderBotFull(botEl, textProvider, false);
+      return;
+    }
+    renderBotPreview(botEl, textProvider);
+  }
+
   // Variante de renderBotFinal para usar A MITAD del streaming en vivo, apenas
   // el texto acumulado cruza el límite — en vez de esperar a que termine de
   // escribir y ahí sí recortar (eso es lo que hacía que el mensaje se
-  // "encogiera" justo cuando el usuario ya iba leyendo más abajo). getFullText
-  // es una función que siempre devuelve el texto acumulado MÁS RECIENTE (no
-  // una copia fija), así que si el usuario hace clic en "Ver respuesta
-  // completa" mientras el streaming sigue, igual obtiene todo lo que haya
-  // llegado hasta ese momento.
+  // "encogiera" justo cuando el usuario ya iba leyendo más abajo).
   function mostrarPrevia(botEl, getFullText){
-    var preview = buildPreview(getFullText()) || getFullText();
-    botEl.innerHTML = renderMarkdownLite(preview);
-    var btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "verMasBtn";
-    btn.innerHTML = "Ver respuesta completa "
-      + "<svg viewBox=\"0 0 12 12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"><path d=\"M2.5 4.5 6 8l3.5-3.5\"/></svg>";
-    btn.addEventListener("click", function(){
-      var full = getFullText();
-      botEl.innerHTML = renderMarkdownLite(full);
-      addCopyButton(botEl, full);
-      scrollToStart(botEl);
-    });
-    botEl.appendChild(btn);
+    renderBotPreview(botEl, getFullText);
   }
 
   function addMessage(role, text, attachmentName, precedingQuestion){
@@ -793,6 +861,11 @@
       }
     } else {
       el.appendChild(document.createTextNode(text));
+      if (role === "user") {
+        // Los mensajes de la persona solo llevan "copiar" — sin minimizar
+        // (no aplica, no tienen vista previa) ni compartir.
+        addMessageOptions(el, { getText: function(){ return text; }, allowShare: false, onMinimize: null });
+      }
     }
 
     // Fila con el avatar junto al mensaje: inicial de la persona (si inició
