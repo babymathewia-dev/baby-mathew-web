@@ -1046,8 +1046,16 @@
     ask(text, files);
   });
 
+  // En celular, el teclado también reporta "Enter" al tocar el ícono de
+  // retorno/enviar del teclado nativo. Ahí lo esperado es que Enter baje de
+  // línea (como en WhatsApp) y que solo el botón "Enviar" envíe el mensaje.
+  // En computador se mantiene el atajo de siempre: Enter envía, Shift+Enter
+  // baja de línea.
+  var esDispositivoTactil = (window.matchMedia && window.matchMedia("(pointer: coarse)").matches)
+    || ("ontouchstart" in window)
+    || (navigator.maxTouchPoints > 0);
   input.addEventListener("keydown", function(ev){
-    if (ev.key === "Enter" && !ev.shiftKey) {
+    if (ev.key === "Enter" && !ev.shiftKey && !esDispositivoTactil) {
       ev.preventDefault();
       form.requestSubmit();
     }
