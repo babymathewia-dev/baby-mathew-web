@@ -80,9 +80,16 @@
     padding:9px 13px; border-radius:999px; font-size:.82rem; cursor:pointer; text-align:left; box-shadow:var(--shadow);
   }
   .chip:hover{border-color:var(--primary);}
-  .msg{max-width:82%;padding:11px 14px;border-radius:16px;font-size:.92rem;line-height:1.5;word-wrap:break-word;box-shadow:var(--shadow);}
-  .msg.user{align-self:flex-end;background:var(--bubble-user);color:var(--bubble-user-text);border-bottom-right-radius:5px;white-space:pre-wrap;}
-  .msg.bot{align-self:flex-start;background:var(--bubble-bot);color:var(--bubble-bot-text);border:1px solid var(--border);border-bottom-left-radius:5px;}
+  .msgRow{display:flex; align-items:flex-end; gap:7px; width:100%;}
+  .msgRow.msgRowUser{justify-content:flex-end;}
+  .msgRow.msgRowBot{justify-content:flex-start;}
+  .msgAvatar{flex:0 0 auto; width:26px; height:26px; border-radius:50%;}
+  .msgAvatarUser{display:flex; align-items:center; justify-content:center; color:#fff; font-size:.7rem; font-weight:700;}
+  .msgAvatarBot{object-fit:cover; background:var(--surface-alt); border:1px solid var(--border);}
+  @media (max-width:420px){ .msgAvatar{width:22px; height:22px; font-size:.62rem;} }
+  .msg{max-width:min(82%, calc(100% - 38px));padding:11px 14px;border-radius:16px;font-size:.92rem;line-height:1.5;word-wrap:break-word;box-shadow:var(--shadow);}
+  .msg.user{background:var(--bubble-user);color:var(--bubble-user-text);border-bottom-right-radius:5px;white-space:pre-wrap;}
+  .msg.bot{background:var(--bubble-bot);color:var(--bubble-bot-text);border:1px solid var(--border);border-bottom-left-radius:5px;}
   .msg.bot.thinking{color:var(--text-muted);font-style:italic;}
   .msg.error{align-self:flex-start;background:var(--danger-bg);border:1px solid var(--danger-border);color:var(--danger-text);white-space:pre-wrap;}
   .msg.bot p{margin:0 0 10px;}
@@ -163,7 +170,7 @@
   .fbBtn:hover:not(:disabled){border-color:var(--primary);}
   .fbBtn:disabled{cursor:default;}
   .fbBtn.fbSelected{border-color:var(--primary);background:var(--surface-alt);}
-  @media (max-width:420px){ .msg{max-width:90%;} }
+  @media (max-width:420px){ .msg{max-width:min(90%, calc(100% - 32px));} }
 
   /* Header: logo + título truncable + acciones (nueva conversación / cuenta
      Google), siempre en una sola fila y sin desbordar en móvil. */
@@ -189,8 +196,12 @@
   #userChip{display:none; align-items:center; gap:6px;}
   #userChip.visible{display:flex;}
   #userChip img{width:30px;height:30px;border-radius:50%;flex:0 0 auto;background:var(--surface-alt);}
-  #userChip .uname{font-size:.72rem;color:var(--text);max-width:64px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  @media (max-width:360px){ #userChip .uname{display:none;} }
+  #userInitial{width:30px;height:30px;border-radius:50%;flex:0 0 auto;display:none;align-items:center;justify-content:center;color:#fff;font-size:.8rem;font-weight:700;}
+  #userInitial.visible{display:flex;}
+  /* El nombre completo ya no se muestra junto al avatar: la inicial (foto de
+     Google o, si no hay foto, el círculo con la inicial) basta para
+     identificar a la persona y así se gana espacio en el encabezado. */
+  #userChip .uname{display:none;}
   #logoutBtn{
     flex:0 0 auto; width:30px; height:30px; padding:0; border-radius:8px;
     border:1px solid var(--border); background:var(--surface-alt); color:var(--text-muted);
@@ -377,6 +388,7 @@
       </button>
       <div id="userChip">
         <img id="userPic" alt="">
+        <span id="userInitial"></span>
         <span id="userName" class="uname"></span>
         <button id="logoutBtn" type="button" aria-label="Cerrar sesión" title="Cerrar sesión">
           <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -465,6 +477,7 @@
   var logoutBtn = document.getElementById("logoutBtn");
   var userChip = document.getElementById("userChip");
   var userPic = document.getElementById("userPic");
+  var userInitial = document.getElementById("userInitial");
   var userName = document.getElementById("userName");
   var disclaimerEl = document.getElementById("disclaimerEl");
   var disclaimerText = document.getElementById("disclaimerText");
@@ -781,8 +794,41 @@
     } else {
       el.appendChild(document.createTextNode(text));
     }
-    main.appendChild(el);
+
+    // Fila con el avatar junto al mensaje: inicial de la persona (si inició
+    // sesión con Google) a la izquierda de sus mensajes, y el logo de la app
+    // a la derecha de las respuestas/errores del bot.
+    var isBotSide = isBot || role === "error";
+    var row = document.createElement("div");
+    row.className = "msgRow " + (isBotSide ? "msgRowBot" : "msgRowUser");
+    if (isBotSide) {
+      row.appendChild(el);
+      var botAv = document.createElement("img");
+      botAv.className = "msgAvatar msgAvatarBot";
+      botAv.src = "/bot-avatar.png";
+      botAv.alt = "";
+      row.appendChild(botAv);
+    } else {
+      if (currentUserName) {
+        var userAv = document.createElement("span");
+        userAv.className = "msgAvatar msgAvatarUser";
+        userAv.textContent = primeraInicial(currentUserName);
+        userAv.style.background = avatarColorFor(currentUserName);
+        row.appendChild(userAv);
+      }
+      row.appendChild(el);
+    }
+    main.appendChild(row);
     scrollToBottom();
+
+    // Algunas llamadas hacen el.remove() (p.ej. al cancelar el "Pensando..."
+    // por error de red). Como ahora el.appendChild ya no cuelga directo de
+    // #main sino de "row", se redefine remove() para quitar toda la fila
+    // (burbuja + avatar) sin tener que tocar cada punto donde se usa.
+    el.remove = function(){
+      if (row.parentNode) row.parentNode.removeChild(row);
+    };
+
     return el;
   }
 
@@ -1141,10 +1187,18 @@
       userChip.classList.add("visible");
       userPic.src = me.picture || "";
       userPic.style.display = me.picture ? "" : "none";
+      if (me.picture) {
+        userInitial.classList.remove("visible");
+      } else {
+        userInitial.textContent = primeraInicial(me.name);
+        userInitial.style.background = avatarColorFor(me.name);
+        userInitial.classList.add("visible");
+      }
       userName.textContent = me.name || "";
       disclaimerText.innerHTML = "<strong>Aviso.</strong> " + DISCLAIMER_LOGGED_IN;
     } else {
       userChip.classList.remove("visible");
+      userInitial.classList.remove("visible");
       loginBtn.style.display = "";
       loginBtn.disabled = me.google_login_enabled === false;
       disclaimerText.innerHTML = "<strong>Aviso.</strong> " + DISCLAIMER_LOCAL;
@@ -1282,6 +1336,12 @@
     var ini = partes[0] ? partes[0][0] : "?";
     if (partes.length > 1 && partes[1]) ini += partes[1][0];
     return ini.toUpperCase();
+  }
+  // Solo la primera letra del nombre (p.ej. para el avatar junto a cada
+  // mensaje del chat y el avatar del encabezado cuando no hay foto de Google).
+  function primeraInicial(nombre){
+    var n = (nombre || "").trim();
+    return n ? n[0].toUpperCase() : "";
   }
   function fmtFecha(iso){
     if (!iso) return "";
