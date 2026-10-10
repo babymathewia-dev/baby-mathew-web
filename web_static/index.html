@@ -787,20 +787,32 @@
   // cameFromPreview indica si este estado "completo" se alcanzó expandiendo
   // una vista previa — solo ahí tiene sentido ofrecer "minimizar" (volver a
   // la vista previa).
-  function renderBotFull(botEl, textProvider, cameFromPreview){
+  //
+  // feedbackRef es un objeto { value: {question,answer} | null } compartido
+  // (por referencia, no una copia) entre todos los repintados de este
+  // mensaje. Mientras el streaming sigue, value es null (aún no hay feedback
+  // que mostrar); en cuanto termina se le asigna el valor real desde ask().
+  // Como "Ver respuesta completa" y "Minimizar" leen feedbackRef.value recién
+  // en el momento del clic (no uno capturado antes), los 👍/👎 aparecen sin
+  // importar si la persona expande o minimiza antes o después de que termine
+  // de llegar la respuesta.
+  function renderBotFull(botEl, textProvider, cameFromPreview, feedbackRef){
     var full = textProvider();
     botEl.innerHTML = renderMarkdownLite(full);
     addMessageOptions(botEl, {
       getText: textProvider,
       allowShare: true,
       onMinimize: cameFromPreview ? function(){
-        renderBotPreview(botEl, textProvider);
+        renderBotPreview(botEl, textProvider, feedbackRef);
         scrollToStart(botEl);
       } : null
     });
+    if (feedbackRef && feedbackRef.value) {
+      addFeedbackButtons(botEl, feedbackRef.value.question, feedbackRef.value.answer);
+    }
   }
 
-  function renderBotPreview(botEl, textProvider){
+  function renderBotPreview(botEl, textProvider, feedbackRef){
     var preview = buildPreview(textProvider()) || textProvider();
     botEl.innerHTML = renderMarkdownLite(preview);
     var btn = document.createElement("button");
@@ -809,27 +821,31 @@
     btn.innerHTML = "Ver respuesta completa "
       + "<svg viewBox=\"0 0 12 12\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.6\"><path d=\"M2.5 4.5 6 8l3.5-3.5\"/></svg>";
     btn.addEventListener("click", function(){
-      renderBotFull(botEl, textProvider, true);
+      renderBotFull(botEl, textProvider, true, feedbackRef);
       scrollToStart(botEl);
     });
     botEl.appendChild(btn);
+    addMessageOptions(botEl, { getText: textProvider, allowShare: true, onMinimize: null });
+    if (feedbackRef && feedbackRef.value) {
+      addFeedbackButtons(botEl, feedbackRef.value.question, feedbackRef.value.answer);
+    }
   }
 
-  function renderBotFinal(botEl, fullText){
+  function renderBotFinal(botEl, fullText, feedbackRef){
     var textProvider = function(){ return fullText; };
     if (!buildPreview(fullText)) {
-      renderBotFull(botEl, textProvider, false);
+      renderBotFull(botEl, textProvider, false, feedbackRef);
       return;
     }
-    renderBotPreview(botEl, textProvider);
+    renderBotPreview(botEl, textProvider, feedbackRef);
   }
 
   // Variante de renderBotFinal para usar A MITAD del streaming en vivo, apenas
   // el texto acumulado cruza el límite — en vez de esperar a que termine de
   // escribir y ahí sí recortar (eso es lo que hacía que el mensaje se
   // "encogiera" justo cuando el usuario ya iba leyendo más abajo).
-  function mostrarPrevia(botEl, getFullText){
-    renderBotPreview(botEl, getFullText);
+  function mostrarPrevia(botEl, getFullText, feedbackRef){
+    renderBotPreview(botEl, getFullText, feedbackRef);
   }
 
   function addMessage(role, text, attachmentName, precedingQuestion){
@@ -852,12 +868,14 @@
         // Mismo criterio de vista previa / "Ver respuesta completa" que al
         // terminar un streaming en vivo, para que una conversación recargada
         // desde el historial se vea igual (sin bloques larguísimos de una).
-        renderBotFinal(el, text);
         // precedingQuestion solo viene informado al reconstruir desde el
         // historial (ver renderTurns) — así también se puede dar feedback a
         // una respuesta de una conversación anterior, no solo a la recién
         // generada (esa ya lo recibe directo en ask()).
-        if (precedingQuestion !== undefined) addFeedbackButtons(el, precedingQuestion, text);
+        var feedbackRef = (precedingQuestion !== undefined)
+          ? { value: { question: precedingQuestion, answer: text } }
+          : null;
+        renderBotFinal(el, text, feedbackRef);
       }
     } else {
       el.appendChild(document.createTextNode(text));
@@ -1048,6 +1066,12 @@
       var huboTexto = false;
       var cortoSinTerminar = true;
       var modoPrevia = false; // true desde que el texto cruza PREVIEW_LIMIT y se muestra la vista previa + "Ver más"
+      // Compartido (por referencia) con mostrarPrevia/renderBotFinal y con los
+      // clics futuros en "Ver respuesta completa"/"Minimizar": mientras el
+      // streaming sigue no hay feedback que mostrar (value es null); en
+      // cuanto termina se le asigna abajo, y cualquier repintado posterior ya
+      // lo recoge solo.
+      var feedbackRef = { value: null };
 
       try {
         while (true) {
@@ -1091,7 +1115,7 @@
                   // de seguir creciendo y recortar de golpe al final (que es
                   // lo que generaba el "encogimiento" a mitad de lectura).
                   modoPrevia = true;
-                  mostrarPrevia(botEl, function(){ return accumulated; });
+                  mostrarPrevia(botEl, function(){ return accumulated; }, feedbackRef);
                 } else {
                   botEl.innerHTML = renderMarkdownLite(accumulated);
                 }
@@ -1109,8 +1133,10 @@
 
       if (erroDeBackend) {
         // El backend ya tradujo el fallo (timeout/error de IA) a un mensaje
-        // claro — se trata igual que una respuesta normal del bot, como antes.
-        renderBotFinal(botEl, erroDeBackend);
+        // claro — se trata igual que una respuesta normal del bot, como antes
+        // (sin feedback: no es una respuesta real de la IA sobre la que tenga
+        // sentido votar 👍/👎).
+        renderBotFinal(botEl, erroDeBackend, null);
         turns.push({ role: "assistant", content: erroDeBackend });
         saveHistory();
         scrollToStart(botEl);
@@ -1123,19 +1149,25 @@
           + "No es un problema de tu conexión — intenta de nuevo en un momento y, si persiste, avísanos.");
         scrollToBottom();
       } else {
+        // Ya hay respuesta completa: a partir de ahora sí hay feedback que
+        // mostrar. feedbackRef.value se deja asignado aquí para que, aunque
+        // el mensaje ya esté pintado (modoPrevia true) o la persona lo
+        // expanda/minimice más tarde, los 👍/👎 terminen apareciendo siempre.
+        feedbackRef.value = { question: displayText, answer: accumulated };
         if (!modoPrevia) {
           // Respuesta corta: nunca cruzó el límite durante el streaming, se
-          // muestra completa como siempre.
-          renderBotFinal(botEl, accumulated);
+          // muestra completa como siempre (ya incluye feedback, por venir de
+          // feedbackRef.value recién asignado).
+          renderBotFinal(botEl, accumulated, feedbackRef);
           scrollToStart(botEl);
+        } else {
+          // botEl ya quedó pintado desde mitad del streaming (previa + botón,
+          // o ya expandido si la persona hizo clic antes de que terminara) —
+          // no se vuelve a tocar su innerHTML ni se reancla el scroll, para
+          // no interrumpir la lectura; los botones de feedback se agregan
+          // aparte (appendChild) sobre ese mismo estado.
+          addFeedbackButtons(botEl, feedbackRef.value.question, feedbackRef.value.answer);
         }
-        // Si modoPrevia ya es true, botEl ya quedó en su estado correcto desde
-        // mitad del streaming (previa + botón, o ya expandido si el usuario
-        // hizo clic) — no se vuelve a tocar su innerHTML ni se reancla el
-        // scroll, para no interrumpir al usuario a mitad de lectura.
-        // Los botones de feedback se agregan aparte (appendChild, no toca el
-        // innerHTML ya pintado) y funcionan igual en los dos casos.
-        addFeedbackButtons(botEl, displayText, accumulated);
         turns.push({ role: "assistant", content: accumulated });
         saveHistory();
         if (cortoSinTerminar) {
