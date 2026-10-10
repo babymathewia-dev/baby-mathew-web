@@ -154,12 +154,20 @@
   .attachChip button{border:none;background:none;color:var(--text-muted);cursor:pointer;font-size:1rem;line-height:1;padding:0 2px;}
   .msg .att{display:block;font-size:.78rem;opacity:.8;margin-bottom:4px;}
   /* Fila de iconos (copiar / minimizar / compartir) en la esquina inferior
-     derecha de cada burbuja — ver addMessageOptions(). */
-  .msgOptions{display:flex;align-items:center;justify-content:flex-end;gap:2px;margin-top:8px;}
+     derecha de cada burbuja — ver addMessageOptions(). Cuando comparte línea
+     con los 👍/👎 (ver .msgActions, para mensajes del bot), margin-left:auto
+     la empuja a la derecha y deja las manitos a la izquierda, ambas en la
+     misma fila; en mensajes del usuario (sin feedback) queda igual que antes. */
+  .msgOptions{display:flex;align-items:center;justify-content:flex-end;gap:2px;margin-top:8px;margin-left:auto;}
   .msgOptBtn{display:flex;align-items:center;justify-content:center;width:26px;height:26px;padding:0;border:none;background:none;border-radius:50%;color:var(--text-muted);cursor:pointer;flex:0 0 auto;}
   .msgOptBtn:hover{background:var(--surface-alt);color:var(--primary-dark);}
   .msg.user .msgOptBtn{color:rgba(255,255,255,.75);}
   .msg.user .msgOptBtn:hover{background:rgba(255,255,255,.18);color:#fff;}
+  /* Fila compartida por los 👍/👎 y los iconos de opciones en las respuestas
+     del bot, para que ambos grupos queden alineados en la misma línea. */
+  .msgActions{display:flex;align-items:center;}
+  .msgActions .msgOptions{margin-top:0;}
+  .msgActions .feedbackBtns{margin-top:0;}
   .verMasBtn{
     display:inline-flex; align-items:center; gap:5px; margin-top:7px;
     border:1px solid var(--border); background:var(--surface-alt); color:var(--primary-dark);
@@ -796,20 +804,31 @@
   // en el momento del clic (no uno capturado antes), los 👍/👎 aparecen sin
   // importar si la persona expande o minimiza antes o después de que termine
   // de llegar la respuesta.
+  // Pinta, en una sola fila (.msgActions), los 👍/👎 (si hay feedback) a la
+  // izquierda y los iconos de copiar/minimizar/compartir a la derecha, para
+  // que ambos grupos queden alineados en la misma línea en vez de uno más
+  // abajo que el otro.
+  function renderMessageActions(botEl, optionsCfg, feedbackRef){
+    var actions = document.createElement("div");
+    actions.className = "msgActions";
+    botEl.appendChild(actions);
+    if (feedbackRef && feedbackRef.value) {
+      addFeedbackButtons(actions, feedbackRef.value.question, feedbackRef.value.answer);
+    }
+    addMessageOptions(actions, optionsCfg);
+  }
+
   function renderBotFull(botEl, textProvider, cameFromPreview, feedbackRef){
     var full = textProvider();
     botEl.innerHTML = renderMarkdownLite(full);
-    addMessageOptions(botEl, {
+    renderMessageActions(botEl, {
       getText: textProvider,
       allowShare: true,
       onMinimize: cameFromPreview ? function(){
         renderBotPreview(botEl, textProvider, feedbackRef);
         scrollToStart(botEl);
       } : null
-    });
-    if (feedbackRef && feedbackRef.value) {
-      addFeedbackButtons(botEl, feedbackRef.value.question, feedbackRef.value.answer);
-    }
+    }, feedbackRef);
   }
 
   function renderBotPreview(botEl, textProvider, feedbackRef){
@@ -825,10 +844,7 @@
       scrollToStart(botEl);
     });
     botEl.appendChild(btn);
-    addMessageOptions(botEl, { getText: textProvider, allowShare: true, onMinimize: null });
-    if (feedbackRef && feedbackRef.value) {
-      addFeedbackButtons(botEl, feedbackRef.value.question, feedbackRef.value.answer);
-    }
+    renderMessageActions(botEl, { getText: textProvider, allowShare: true, onMinimize: null }, feedbackRef);
   }
 
   function renderBotFinal(botEl, fullText, feedbackRef){
