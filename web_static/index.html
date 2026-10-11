@@ -268,7 +268,7 @@
   }
   .fld input:focus, .fld select:focus, .fld textarea:focus{outline:2px solid var(--primary); outline-offset:1px;}
   .fldRow{display:flex; gap:10px;}
-  .fldRow .fld{flex:1;}
+  .fldRow .fld{flex:1; min-width:0;}
 
   .btnPrimary{width:100%; border:none; border-radius:999px; padding:13px; background:var(--primary); color:#fff; font-weight:700; font-size:.9rem; cursor:pointer;}
   .btnPrimary:disabled{opacity:.55; cursor:default;}
@@ -1511,7 +1511,7 @@
   // Al cargar: revisa si hay sesión de Google iniciada y, según eso, restaura
   // el historial desde el servidor (cuenta) o desde este navegador (anónimo).
   // --- Aceptación de Términos / Política de Datos (num. 2 y 16 del documento legal) ---
-  var TERMS_VERSION = "2026-10-01"; // debe coincidir con TERMS_VERSION en web_app.py
+  var TERMS_VERSION = "2026-10-11"; // debe coincidir con TERMS_VERSION en web_app.py
   var termsOverlay = document.getElementById("termsOverlay");
   var termsCheckbox = document.getElementById("termsCheckbox");
   var termsAcceptBtn = document.getElementById("termsAcceptBtn");
