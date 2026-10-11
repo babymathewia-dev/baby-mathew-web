@@ -103,6 +103,27 @@ FULL_SYSTEM_PROMPT = f"""{SYSTEM_PROMPT}
 Nota adicional: esta es la versión web del piloto (no Telegram). Mantén el mismo protocolo de seguridad y límites.
 """
 
+
+def _build_system_blocks(contexto_bebe):
+    """Arma la lista `system` para la llamada al modelo. FULL_SYSTEM_PROMPT
+    siempre va primero con cache_control (no cambia entre mensajes). El
+    contexto del bebé, cuando existe, va como SEGUNDO bloque, sin
+    cache_control y sin mezclarse con el primero — si se mezclara, cada
+    mensaje tendría un FULL_SYSTEM_PROMPT distinto (porque el contexto varía
+    por usuario y por día) y Anthropic nunca podría reutilizar el caché del
+    bloque grande, subiendo el costo y la latencia de cada turno."""
+    blocks = [
+        {
+            "type": "text",
+            "text": FULL_SYSTEM_PROMPT,
+            "cache_control": {"type": "ephemeral"},
+        }
+    ]
+    if contexto_bebe:
+        blocks.append({"type": "text", "text": contexto_bebe})
+    return blocks
+
+
 anthropic_client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
 # Herramienta de búsqueda web en vivo (Anthropic la ejecuta del lado del servidor).
@@ -381,7 +402,7 @@ def get_db():
     return conn
 
 
-TERMS_VERSION = "2026-10-01"  # sube esta fecha cada vez que cambie el texto legal publicado en /terminos.html
+TERMS_VERSION = "2026-10-11"  # sube esta fecha cada vez que cambie el texto legal publicado en /terminos.html
 
 
 def init_db():
@@ -534,6 +555,23 @@ def init_db():
             fecha_envio TEXT NOT NULL,
             created_at TEXT DEFAULT CURRENT_TIMESTAMP,
             UNIQUE (medicamento_id, fecha_envio)
+        )"""
+    )
+    # Registro de crecimiento (peso/talla/perímetro cefálico). Datos de salud
+    # del menor — sensibles bajo la Ley 1581 de 2012 (arts. 5 y 7); requieren
+    # autorización expresa del representante legal (ver /terminos.html y
+    # TERMS_VERSION). Compartido entre los cuidadores vinculados al bebé,
+    # igual que citas y medicamentos.
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS crecimiento (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bebe_id INTEGER NOT NULL REFERENCES bebes(id),
+            fecha TEXT NOT NULL,
+            peso_g INTEGER,
+            talla_mm INTEGER,
+            perimetro_cefalico_mm INTEGER,
+            registrado_por INTEGER NOT NULL REFERENCES users(id),
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )"""
     )
     conn.commit()
@@ -746,6 +784,84 @@ def _mi_bebe_id(conn, user_id):
     return row["bebe_id"] if row else None
 
 
+def _contexto_bebe(conn, user_id):
+    """Texto corto (edad del bebé o semana de embarazo + última medición de
+    crecimiento, si existe) para que el modelo ajuste la respuesta sin que el
+    padre tenga que repetir el dato en cada mensaje. Se envía como bloque de
+    system APARTE en chat() — nunca mezclado con FULL_SYSTEM_PROMPT, para no
+    romper el cache_control del prompt base (ver nota ahí). Devuelve None si
+    el usuario no tiene perfil de bebé o no hay datos suficientes."""
+    bebe_id = _mi_bebe_id(conn, user_id)
+    if not bebe_id:
+        return None
+    bebe = conn.execute(
+        """SELECT nombre, etapa, semana_gestacion, fecha_parto_probable,
+                  fecha_nacimiento, sexo FROM bebes WHERE id = ?""",
+        (bebe_id,),
+    ).fetchone()
+    if not bebe:
+        return None
+
+    hoy = date.today()
+    partes = []
+
+    if bebe["etapa"] == "nacido" and bebe["fecha_nacimiento"]:
+        try:
+            nacimiento = date.fromisoformat(bebe["fecha_nacimiento"])
+        except (ValueError, TypeError):
+            nacimiento = None
+        if nacimiento and nacimiento <= hoy:
+            dias = (hoy - nacimiento).days
+            semanas = dias // 7
+            meses = round(dias / 30.44, 1)
+            nombre = f" {bebe['nombre']}" if bebe["nombre"] else ""
+            texto = (
+                f"Contexto del usuario: su bebé{nombre} nació el {bebe['fecha_nacimiento']}; "
+                f"hoy tiene {semanas} semanas ({meses} meses)."
+            )
+            if bebe["sexo"]:
+                texto += f" Sexo: {bebe['sexo']}."
+            partes.append(texto)
+    elif bebe["etapa"] == "gestacion":
+        # La semana registrada es estática (se guardó en algún momento), así
+        # que si hay fecha probable de parto se recalcula la semana actual a
+        # partir de ella (40 semanas de gestación); si no, se usa la semana
+        # tal como la registró el cuidador.
+        semana = bebe["semana_gestacion"]
+        fpp = bebe["fecha_parto_probable"]
+        if fpp:
+            try:
+                parto = date.fromisoformat(fpp)
+                semanas_restantes = (parto - hoy).days / 7
+                semana = max(1, min(42, round(40 - semanas_restantes)))
+            except (ValueError, TypeError):
+                pass
+        if semana:
+            texto = f"Contexto: embarazo de {semana} semanas"
+            if fpp:
+                texto += f" (fecha probable de parto {fpp})"
+            texto += "."
+            partes.append(texto)
+
+    if not partes:
+        return None
+
+    ultimo = conn.execute(
+        """SELECT fecha, peso_g, talla_mm FROM crecimiento WHERE bebe_id = ?
+           ORDER BY fecha DESC, id DESC LIMIT 1""",
+        (bebe_id,),
+    ).fetchone()
+    if ultimo and (ultimo["peso_g"] or ultimo["talla_mm"]):
+        medidas = []
+        if ultimo["peso_g"]:
+            medidas.append(f"peso {ultimo['peso_g'] / 1000:.2f} kg")
+        if ultimo["talla_mm"]:
+            medidas.append(f"talla {ultimo['talla_mm'] / 10:.1f} cm")
+        partes.append(f"Último control: {', '.join(medidas)} ({ultimo['fecha']}).")
+
+    return " ".join(partes)
+
+
 def _generar_codigo_invitacion():
     import secrets
     import string
@@ -823,6 +939,35 @@ def api_bebe_save():
     conn.commit()
     conn.close()
     return jsonify({"ok": True, "bebe_id": bebe_id})
+
+
+@app.route("/api/bebe", methods=["DELETE"])
+@limiter.limit("5 per hour")
+def api_bebe_delete():
+    # Borra el perfil completo del bebé: datos básicos, cuidadores,
+    # invitaciones, citas, medicamentos y todas las mediciones de
+    # crecimiento (dato sensible de salud de un menor — Ley 1581 de 2012).
+    # Cualquier cuidador vinculado puede solicitarlo, igual que ya puede ver
+    # y editar el perfil compartido.
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    conn = get_db()
+    bebe_id = _mi_bebe_id(conn, session["user_id"])
+    if not bebe_id:
+        conn.close()
+        return jsonify({"error": "sin_perfil"}), 400
+    conn.execute("DELETE FROM crecimiento WHERE bebe_id = ?", (bebe_id,))
+    conn.execute("DELETE FROM medicamento_avisos_enviados WHERE medicamento_id IN (SELECT id FROM medicamentos WHERE bebe_id = ?)", (bebe_id,))
+    conn.execute("DELETE FROM medicamentos WHERE bebe_id = ?", (bebe_id,))
+    conn.execute("DELETE FROM cita_avisos_enviados WHERE cita_id IN (SELECT id FROM citas WHERE bebe_id = ?)", (bebe_id,))
+    conn.execute("DELETE FROM citas WHERE bebe_id = ?", (bebe_id,))
+    conn.execute("DELETE FROM bebe_invitaciones WHERE bebe_id = ?", (bebe_id,))
+    conn.execute("DELETE FROM bebe_cuidadores WHERE bebe_id = ?", (bebe_id,))
+    conn.execute("DELETE FROM bebes WHERE id = ?", (bebe_id,))
+    conn.commit()
+    conn.close()
+    logger.info("perfil_bebe_eliminado bebe_id=%s", bebe_id)
+    return jsonify({"ok": True})
 
 
 @app.route("/api/bebe/invitar", methods=["POST"])
@@ -1126,6 +1271,121 @@ def api_medicamentos_delete(medicamento_id):
         conn.close()
         return jsonify({"error": "sin_perfil"}), 400
     conn.execute("DELETE FROM medicamentos WHERE id = ? AND bebe_id = ?", (medicamento_id, bebe_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+# ---------------------------------------------------------------------------
+# Registro de crecimiento (peso/talla/perímetro cefálico). Datos de salud del
+# menor — sensibles (Ley 1581 de 2012). Solo aplica a un bebé ya nacido: no
+# tiene sentido registrar mediciones durante la gestación.
+# ---------------------------------------------------------------------------
+
+# Rangos de validación — pensados para descartar errores de digitación
+# obvios (ej. escribir 75 kg en vez de 7.5 kg), no como un rango clínico.
+CRECIMIENTO_RANGOS = {
+    "peso_g": (500, 25000),            # 0,5 a 25 kg
+    "talla_mm": (300, 1100),           # 30 a 110 cm
+    "perimetro_cefalico_mm": (250, 600),  # 25 a 60 cm
+}
+
+
+@app.route("/api/bebe/crecimiento", methods=["GET"])
+def api_crecimiento_list():
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    conn = get_db()
+    bebe_id = _mi_bebe_id(conn, session["user_id"])
+    if not bebe_id:
+        conn.close()
+        return jsonify({"error": "sin_perfil"}), 400
+    rows = conn.execute(
+        """SELECT cr.*, u.name AS registrado_por_nombre
+           FROM crecimiento cr JOIN users u ON u.id = cr.registrado_por
+           WHERE cr.bebe_id = ? ORDER BY cr.fecha ASC, cr.id ASC""",
+        (bebe_id,),
+    ).fetchall()
+    conn.close()
+    return jsonify({"mediciones": [dict(r) for r in rows]})
+
+
+@app.route("/api/bebe/crecimiento", methods=["POST"])
+@limiter.limit("30 per hour")
+def api_crecimiento_create():
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    conn = get_db()
+    user_id = session["user_id"]
+    bebe_id = _mi_bebe_id(conn, user_id)
+    if not bebe_id:
+        conn.close()
+        return jsonify({"error": "sin_perfil"}), 400
+
+    bebe = conn.execute("SELECT etapa, fecha_nacimiento FROM bebes WHERE id = ?", (bebe_id,)).fetchone()
+    if not bebe or bebe["etapa"] != "nacido" or not bebe["fecha_nacimiento"]:
+        conn.close()
+        return jsonify({"error": "bebe_no_nacido"}), 400
+
+    data = request.get_json(silent=True) or {}
+    fecha = (data.get("fecha") or "").strip()[:10]
+    try:
+        fecha_dt = date.fromisoformat(fecha)
+    except (ValueError, TypeError):
+        conn.close()
+        return jsonify({"error": "fecha_invalida"}), 400
+    try:
+        fecha_nacimiento_dt = date.fromisoformat(bebe["fecha_nacimiento"])
+    except (ValueError, TypeError):
+        fecha_nacimiento_dt = None
+    if fecha_dt > date.today():
+        conn.close()
+        return jsonify({"error": "fecha_futura"}), 400
+    if fecha_nacimiento_dt and fecha_dt < fecha_nacimiento_dt:
+        conn.close()
+        return jsonify({"error": "fecha_anterior_al_nacimiento"}), 400
+
+    valores = {}
+    for campo, (minimo, maximo) in CRECIMIENTO_RANGOS.items():
+        bruto = data.get(campo)
+        if bruto in (None, ""):
+            valores[campo] = None
+            continue
+        try:
+            valor = int(bruto)
+        except (TypeError, ValueError):
+            conn.close()
+            return jsonify({"error": "invalid_request", "campo": campo}), 400
+        if not (minimo <= valor <= maximo):
+            conn.close()
+            return jsonify({"error": "fuera_de_rango", "campo": campo}), 400
+        valores[campo] = valor
+
+    if not any(valores.values()):
+        conn.close()
+        return jsonify({"error": "sin_datos"}), 400
+
+    cur = conn.execute(
+        """INSERT INTO crecimiento (bebe_id, fecha, peso_g, talla_mm, perimetro_cefalico_mm, registrado_por)
+           VALUES (?, ?, ?, ?, ?, ?)""",
+        (bebe_id, fecha, valores["peso_g"], valores["talla_mm"], valores["perimetro_cefalico_mm"], user_id),
+    )
+    conn.commit()
+    medicion_id = cur.lastrowid
+    conn.close()
+    return jsonify({"ok": True, "id": medicion_id})
+
+
+@app.route("/api/bebe/crecimiento/<int:medicion_id>", methods=["DELETE"])
+def api_crecimiento_delete(medicion_id):
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    conn = get_db()
+    bebe_id = _mi_bebe_id(conn, session["user_id"])
+    if not bebe_id:
+        conn.close()
+        return jsonify({"error": "sin_perfil"}), 400
+    conn.execute("DELETE FROM crecimiento WHERE id = ? AND bebe_id = ?", (medicion_id, bebe_id))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
@@ -1459,6 +1719,18 @@ def chat():
     # entonces `session` ya podría no estar disponible de forma confiable.
     user_id = session.get("user_id")
 
+    # Contexto del perfil del bebé (edad real / semana de embarazo + última
+    # medición), si el usuario tiene sesión y perfil creado. Se calcula acá,
+    # no dentro del generador, por la misma razón que user_id.
+    contexto_bebe = None
+    if user_id:
+        try:
+            _conn_ctx = get_db()
+            contexto_bebe = _contexto_bebe(_conn_ctx, user_id)
+            _conn_ctx.close()
+        except Exception:
+            logger.exception("No se pudo construir el contexto del bebé para la consulta")
+
     def generate():
         reply_text = ""
         try:
@@ -1487,13 +1759,7 @@ def chat():
                 # ephemeral). Esto reduce fuertemente el costo y la latencia de cada turno,
                 # ya que Anthropic reutiliza el procesamiento de ese bloque en vez de
                 # reprocesarlo completo en cada llamada.
-                system=[
-                    {
-                        "type": "text",
-                        "text": FULL_SYSTEM_PROMPT,
-                        "cache_control": {"type": "ephemeral"},
-                    }
-                ],
+                system=_build_system_blocks(contexto_bebe),
                 messages=cleaned,
             )
             if usar_busqueda:
@@ -1545,9 +1811,13 @@ def chat():
             tema = tema_futuro.result(timeout=5)
         except Exception:
             tema = "Otro"
-        logger.info("consulta_respondida tema=%s", tema)
+        # [ANALÍTICA] con_perfil: si la respuesta se ajustó con el contexto
+        # del bebé (función 1). Nunca se registra el contenido del contexto
+        # en sí (edad, peso, etc.), solo esta bandera sí/no.
+        con_perfil = bool(contexto_bebe)
+        logger.info("consulta_respondida tema=%s con_perfil=%s", tema, "si" if con_perfil else "no")
 
-        yield "data: " + json.dumps({"done": True, "tema": tema}) + "\n\n"
+        yield "data: " + json.dumps({"done": True, "tema": tema, "con_perfil": con_perfil}) + "\n\n"
 
     resp = Response(stream_with_context(generate()), mimetype="text/event-stream")
     # Evita que algún proxy intermedio (p.ej. Cloudflare, que está delante de
