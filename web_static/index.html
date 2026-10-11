@@ -36,7 +36,7 @@
   body{
     background:var(--bg); color:var(--text);
     font-family:"Source Sans 3", ui-sans-serif, system-ui, sans-serif;
-    display:flex; flex-direction:column; height:100%; overflow:hidden;
+    display:flex; flex-direction:column; align-items:center; height:100%; overflow:hidden;
   }
   h1,h2{font-family:"Baloo 2","Source Sans 3",sans-serif;}
   header{
@@ -318,6 +318,47 @@
   .toggleRow .txt small{font-size:.72rem; color:var(--text-muted);}
   .codigoBox{background:var(--surface-alt); border:1px solid var(--border); border-radius:12px; padding:14px; text-align:center; margin-top:10px;}
   .codigoBox .codigo{font-size:1.4rem; font-weight:700; letter-spacing:.12em; color:var(--primary-dark); font-family:"Baloo 2",sans-serif;}
+
+  /* Centra el chat en pantallas anchas (tablet/escritorio). En móvil
+     (menos de ~760px) no cambia nada visualmente: el bloque ya ocupa el
+     100% del ancho. En pantallas más anchas evita que el contenido se
+     estire borde a borde con líneas de texto demasiado largas y que las
+     burbujas del chat queden pegadas al borde de la ventana. */
+  header, #sonidosMiniBar, .disclaimer, main, #attachChips, form#composer{
+    width:100%; max-width:760px; margin-left:auto; margin-right:auto;
+  }
+
+  /* Botón de cerrar sesión: mismo tratamiento circular que el resto de
+     íconos del encabezado (contactar, iniciar sesión), en vez de un
+     cuadrado con esquinas redondeadas que desentonaba al lado de ellos. */
+  #logoutBtn{border-radius:50%;}
+
+  /* Adjuntar y "más opciones" quedan a la misma altura que "Enviar"
+     (antes eran más bajos y se veían desalineados contra el textarea). */
+  #attachBtn, #newChatBtn{width:44px; height:44px; border-radius:14px;}
+
+  /* Mensaje de emergencia del protocolo de seguridad: se resalta como
+     aviso (mismo tratamiento de color que los errores) en vez de verse
+     como un párrafo más dentro de la respuesta. */
+  .msg.bot p.alertCallout{
+    background:var(--danger-bg); border:1px solid var(--danger-border); color:var(--danger-text);
+    padding:10px 12px; border-radius:10px; font-weight:700; margin:2px 0 10px;
+  }
+
+  /* Aviso legal: colapsado a una línea por defecto, con un botón para
+     ver el texto completo — antes ocupaba varias líneas fijas arriba
+     del chat en cada visita. El botón de cerrar (X) sigue descartándolo
+     del todo, como antes. */
+  .disclaimer #disclaimerText{
+    display:-webkit-box; -webkit-box-orient:vertical; -webkit-line-clamp:1; overflow:hidden;
+  }
+  .disclaimer #disclaimerText.expanded{
+    display:block; -webkit-line-clamp:unset; overflow:visible;
+  }
+  .disclaimer-toggle{
+    display:inline-block; margin-top:4px; padding:0; border:none; background:none;
+    color:var(--primary-dark); font-size:.72rem; font-weight:700; text-decoration:underline; cursor:pointer;
+  }
 </style>
 </head>
 <body>
@@ -419,6 +460,7 @@
 
   <div class="disclaimer" id="disclaimerEl">
     <span id="disclaimerText"><strong>Aviso.</strong> Soy un asistente informativo, no un profesional de la salud. No diagnostico ni prescribo. Ante cualquier duda urgente, contacta siempre a tu médico o acude a urgencias. Puedes adjuntar hasta 5 documentos o fotos (PDF, imágenes o texto) con el ícono 📎; los uso solo para responder tu pregunta, no quedan guardados. Tu conversación se guarda únicamente en este navegador para que puedas continuarla luego — no se envía a nadie más ni queda en nuestros servidores.</span>
+    <button type="button" id="disclaimerToggleBtn" class="disclaimer-toggle">Ver aviso completo</button>
     <button type="button" id="disclaimerCloseBtn" class="disclaimer-close" aria-label="Cerrar aviso" title="Cerrar aviso"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></button>
   </div>
 
@@ -495,6 +537,7 @@
   var disclaimerEl = document.getElementById("disclaimerEl");
   var disclaimerText = document.getElementById("disclaimerText");
   var disclaimerCloseBtn = document.getElementById("disclaimerCloseBtn");
+  var disclaimerToggleBtn = document.getElementById("disclaimerToggleBtn");
   var DISCLAIMER_DISMISS_KEY = "babymathew_disclaimer_dismissed_v1";
   var menuBebe = document.getElementById("menuBebe");
   var menuAgenda = document.getElementById("menuAgenda");
@@ -579,6 +622,22 @@
   // Convierte un subconjunto simple de Markdown (encabezados #, negrita **, listas -)
   // a HTML seguro (todo el texto se escapa primero), para que las respuestas del
   // asistente se vean limpias en vez de mostrar los símbolos literales.
+  // Frases exactas del protocolo de seguridad (system_prompt.md), en español
+  // e inglés — el modelo las usa "tal cual, sin suavizar ni acortar", así que
+  // una coincidencia de subcadena basta para detectarlas y resaltarlas como
+  // aviso, sin depender de que el backend marque nada especial.
+  var EMERGENCY_PHRASES = [
+    "esto que describes puede ser una señal de alarma",
+    "what you're describing could be a warning sign"
+  ];
+  function esFraseDeEmergencia(line){
+    var lower = line.toLowerCase();
+    for (var j = 0; j < EMERGENCY_PHRASES.length; j++) {
+      if (lower.indexOf(EMERGENCY_PHRASES[j]) !== -1) return true;
+    }
+    return false;
+  }
+
   function renderMarkdownLite(text){
     var escaped = escapeHtml(text);
     var lines = escaped.split(/\r?\n/);
@@ -605,7 +664,11 @@
       } else {
         closeList();
         if (line.trim() === "") continue; // colapsa líneas vacías (el <p> ya da espaciado)
-        html += "<p>" + inline(line) + "</p>";
+        if (esFraseDeEmergencia(line)) {
+          html += "<p class=\"alertCallout\">⚠️ " + inline(line) + "</p>";
+        } else {
+          html += "<p>" + inline(line) + "</p>";
+        }
       }
     }
     closeList();
@@ -1405,6 +1468,10 @@
     disclaimerCloseBtn.addEventListener("click", function(){
       disclaimerEl.classList.add("hidden");
       try { localStorage.setItem(DISCLAIMER_DISMISS_KEY, "1"); } catch (e) { /* no-op */ }
+    });
+    disclaimerToggleBtn.addEventListener("click", function(){
+      var expanded = disclaimerText.classList.toggle("expanded");
+      disclaimerToggleBtn.textContent = expanded ? "Ver menos" : "Ver aviso completo";
     });
   })();
 
@@ -2368,7 +2435,7 @@
         }
       } catch (e) { /* si falla, arranca sin historial previo */ }
     } else {
-      renderTurns(loadLocalHistory());
+      renderTurns(loadHistory());
     }
   })();
 })();
