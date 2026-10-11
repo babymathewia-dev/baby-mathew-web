@@ -400,7 +400,7 @@
         </svg>
       </button>
       <div id="userChip">
-        <img id="userPic" alt="">
+        <img id="userPic" alt="" onerror="this.style.display='none'; document.getElementById('userInitial').classList.add('visible');">
         <span id="userInitial"></span>
         <span id="userName" class="uname"></span>
         <button id="logoutBtn" type="button" aria-label="Cerrar sesión" title="Cerrar sesión">
@@ -1306,13 +1306,18 @@
     if (loggedIn) {
       loginBtn.style.display = "none";
       userChip.classList.add("visible");
-      userPic.src = me.picture || "";
-      userPic.style.display = me.picture ? "" : "none";
+      // La inicial siempre se deja lista como respaldo: si la foto de Google
+      // no carga (algunos navegadores de iOS la bloquean sin cookies de
+      // terceros), en vez de un ícono de imagen rota se ve la inicial.
+      userInitial.textContent = primeraInicial(me.name);
+      userInitial.style.background = avatarColorFor(me.name);
       if (me.picture) {
+        userPic.src = me.picture;
+        userPic.style.display = "";
         userInitial.classList.remove("visible");
       } else {
-        userInitial.textContent = primeraInicial(me.name);
-        userInitial.style.background = avatarColorFor(me.name);
+        userPic.removeAttribute("src");
+        userPic.style.display = "none";
         userInitial.classList.add("visible");
       }
       userName.textContent = me.name || "";
