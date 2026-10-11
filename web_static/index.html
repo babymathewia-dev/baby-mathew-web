@@ -36,7 +36,7 @@
   body{
     background:var(--bg); color:var(--text);
     font-family:"Source Sans 3", ui-sans-serif, system-ui, sans-serif;
-    display:flex; flex-direction:column; align-items:center; height:100%; overflow:hidden;
+    display:flex; flex-direction:column; height:100%; overflow:hidden;
   }
   h1,h2{font-family:"Baloo 2","Source Sans 3",sans-serif;}
   header{
@@ -318,15 +318,6 @@
   .toggleRow .txt small{font-size:.72rem; color:var(--text-muted);}
   .codigoBox{background:var(--surface-alt); border:1px solid var(--border); border-radius:12px; padding:14px; text-align:center; margin-top:10px;}
   .codigoBox .codigo{font-size:1.4rem; font-weight:700; letter-spacing:.12em; color:var(--primary-dark); font-family:"Baloo 2",sans-serif;}
-
-  /* Centra el chat en pantallas anchas (tablet/escritorio). En móvil
-     (menos de ~760px) no cambia nada visualmente: el bloque ya ocupa el
-     100% del ancho. En pantallas más anchas evita que el contenido se
-     estire borde a borde con líneas de texto demasiado largas y que las
-     burbujas del chat queden pegadas al borde de la ventana. */
-  header, #sonidosMiniBar, .disclaimer, main, #attachChips, form#composer{
-    width:100%; max-width:760px; margin-left:auto; margin-right:auto;
-  }
 
   /* Botón de cerrar sesión: mismo tratamiento circular que el resto de
      íconos del encabezado (contactar, iniciar sesión), en vez de un
