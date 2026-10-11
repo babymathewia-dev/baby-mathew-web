@@ -581,6 +581,21 @@ def init_db():
             created_at TEXT DEFAULT CURRENT_TIMESTAMP
         )"""
     )
+    # Historial del bebé: comentarios libres de los cuidadores (hitos,
+    # observaciones, lo que diga el pediatra). Es un primer paso simple,
+    # pensado para evolucionar más adelante hacia algo más estructurado tipo
+    # historia clínica — por ahora solo texto libre, sin clasificar ni
+    # interpretar. Puede contener datos sensibles de salud del menor, igual
+    # que crecimiento, bajo la misma autorización de /terminos.html.
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS notas_bebe (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bebe_id INTEGER NOT NULL REFERENCES bebes(id),
+            texto TEXT NOT NULL,
+            created_by INTEGER NOT NULL REFERENCES users(id),
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP
+        )"""
+    )
     conn.commit()
     conn.close()
 
@@ -964,6 +979,7 @@ def api_bebe_delete():
         conn.close()
         return jsonify({"error": "sin_perfil"}), 400
     conn.execute("DELETE FROM crecimiento WHERE bebe_id = ?", (bebe_id,))
+    conn.execute("DELETE FROM notas_bebe WHERE bebe_id = ?", (bebe_id,))
     conn.execute("DELETE FROM medicamento_avisos_enviados WHERE medicamento_id IN (SELECT id FROM medicamentos WHERE bebe_id = ?)", (bebe_id,))
     conn.execute("DELETE FROM medicamentos WHERE bebe_id = ?", (bebe_id,))
     conn.execute("DELETE FROM cita_avisos_enviados WHERE cita_id IN (SELECT id FROM citas WHERE bebe_id = ?)", (bebe_id,))
@@ -1428,6 +1444,74 @@ def api_crecimiento_delete(medicion_id):
         conn.close()
         return jsonify({"error": "sin_perfil"}), 400
     conn.execute("DELETE FROM crecimiento WHERE id = ? AND bebe_id = ?", (medicion_id, bebe_id))
+    conn.commit()
+    conn.close()
+    return jsonify({"ok": True})
+
+
+NOTA_BEBE_MAX_CHARS = 2000
+
+
+@app.route("/api/bebe/notas", methods=["GET"])
+def api_notas_list():
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    conn = get_db()
+    bebe_id = _mi_bebe_id(conn, session["user_id"])
+    if not bebe_id:
+        conn.close()
+        return jsonify({"error": "sin_perfil"}), 400
+    rows = conn.execute(
+        """SELECT n.id, n.texto, n.created_at, u.name AS autor_nombre
+           FROM notas_bebe n JOIN users u ON u.id = n.created_by
+           WHERE n.bebe_id = ? ORDER BY n.created_at ASC, n.id ASC""",
+        (bebe_id,),
+    ).fetchall()
+    conn.close()
+    return jsonify({"notas": [dict(r) for r in rows]})
+
+
+@app.route("/api/bebe/notas", methods=["POST"])
+@limiter.limit("30 per hour")
+def api_notas_create():
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    conn = get_db()
+    user_id = session["user_id"]
+    bebe_id = _mi_bebe_id(conn, user_id)
+    if not bebe_id:
+        conn.close()
+        return jsonify({"error": "sin_perfil"}), 400
+
+    data = request.get_json(silent=True) or {}
+    texto = (data.get("texto") or "").strip()
+    if not texto:
+        conn.close()
+        return jsonify({"error": "nota_vacia"}), 400
+    if len(texto) > NOTA_BEBE_MAX_CHARS:
+        conn.close()
+        return jsonify({"error": "nota_muy_larga"}), 400
+
+    cur = conn.execute(
+        "INSERT INTO notas_bebe (bebe_id, texto, created_by) VALUES (?, ?, ?)",
+        (bebe_id, texto, user_id),
+    )
+    conn.commit()
+    nota_id = cur.lastrowid
+    conn.close()
+    return jsonify({"ok": True, "id": nota_id})
+
+
+@app.route("/api/bebe/notas/<int:nota_id>", methods=["DELETE"])
+def api_notas_delete(nota_id):
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    conn = get_db()
+    bebe_id = _mi_bebe_id(conn, session["user_id"])
+    if not bebe_id:
+        conn.close()
+        return jsonify({"error": "sin_perfil"}), 400
+    conn.execute("DELETE FROM notas_bebe WHERE id = ? AND bebe_id = ?", (nota_id, bebe_id))
     conn.commit()
     conn.close()
     return jsonify({"ok": True})
