@@ -474,6 +474,13 @@ def init_db():
             updated_at TEXT DEFAULT CURRENT_TIMESTAMP
         )"""
     )
+    # Migración: columna de foto del bebé (data URI, agregada después de la
+    # creación inicial de la tabla — ver el comentario de migración de
+    # `users` más arriba sobre por qué se intenta así).
+    try:
+        conn.execute("ALTER TABLE bebes ADD COLUMN foto TEXT")
+    except sqlite3.OperationalError:
+        pass  # la columna ya existe
     conn.execute(
         """CREATE TABLE IF NOT EXISTS bebe_cuidadores (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -967,6 +974,41 @@ def api_bebe_delete():
     conn.commit()
     conn.close()
     logger.info("perfil_bebe_eliminado bebe_id=%s", bebe_id)
+    return jsonify({"ok": True})
+
+
+FOTO_BEBE_MAX_CHARS = 400_000  # ~300 KB de imagen ya comprimida/redimensionada en el navegador
+
+
+@app.route("/api/bebe/foto", methods=["POST"])
+@limiter.limit("20 per hour")
+def api_bebe_foto():
+    # Guarda (o borra, si foto=null) la foto del bebé como data URI. El
+    # redimensionado/compresión ocurre en el navegador antes de llegar
+    # acá — este endpoint solo valida tipo y tamaño.
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    conn = get_db()
+    bebe_id = _mi_bebe_id(conn, session["user_id"])
+    if not bebe_id:
+        conn.close()
+        return jsonify({"error": "sin_perfil"}), 400
+
+    data = request.get_json(silent=True) or {}
+    foto = data.get("foto")
+    if foto is None:
+        conn.execute("UPDATE bebes SET foto = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (bebe_id,))
+        conn.commit()
+        conn.close()
+        return jsonify({"ok": True, "foto": None})
+
+    if not isinstance(foto, str) or not foto.startswith("data:image/") or len(foto) > FOTO_BEBE_MAX_CHARS:
+        conn.close()
+        return jsonify({"error": "foto_invalida"}), 400
+
+    conn.execute("UPDATE bebes SET foto = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?", (foto, bebe_id))
+    conn.commit()
+    conn.close()
     return jsonify({"ok": True})
 
 
