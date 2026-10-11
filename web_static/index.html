@@ -259,7 +259,6 @@
   .modalCloseBtn svg{width:15px;height:15px;}
   .modalCloseBtn:hover{background:var(--surface-alt); color:var(--text);}
   .modalBody{flex:1 1 auto; overflow-y:auto; padding:18px 20px calc(20px + env(safe-area-inset-bottom,0px));}
-  .modalHeader.green{background:var(--surface-alt);}
 
   .fld{margin-bottom:14px;}
   .fld label{display:block; font-size:.78rem; font-weight:700; color:var(--primary-dark); margin-bottom:6px;}
@@ -422,16 +421,6 @@
     </div>
   </div>
 
-  <div id="historialOverlay" class="modalOverlay hidden">
-    <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="historialModalTitle">
-      <div class="modalHeader green">
-        <h2 id="historialModalTitle">Historial</h2>
-        <button type="button" class="modalCloseBtn" id="historialCloseBtn" aria-label="Cerrar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></button>
-      </div>
-      <div class="modalBody" id="historialModalBody"></div>
-    </div>
-  </div>
-
   <div id="contactOverlay" class="modalOverlay hidden">
     <div class="modalCard" role="dialog" aria-modal="true" aria-labelledby="contactModalTitle">
       <div class="modalHeader">
@@ -530,10 +519,6 @@
         <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
         Agenda
       </button>
-      <button type="button" class="more-menu-item" id="menuHistorial" role="menuitem">
-        <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg></span>
-        Historial del bebé
-      </button>
       <button type="button" class="more-menu-item" id="menuSonidos" role="menuitem">
         <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
         Sonidos para dormir
@@ -579,17 +564,12 @@
   var DISCLAIMER_DISMISS_KEY = "babymathew_disclaimer_dismissed_v1";
   var menuBebe = document.getElementById("menuBebe");
   var menuAgenda = document.getElementById("menuAgenda");
-  var menuHistorial = document.getElementById("menuHistorial");
   var bebeOverlay = document.getElementById("bebeOverlay");
   var bebeModalBody = document.getElementById("bebeModalBody");
   var bebeCloseBtn = document.getElementById("bebeCloseBtn");
   var agendaOverlay = document.getElementById("agendaOverlay");
   var agendaModalBody = document.getElementById("agendaModalBody");
   var agendaCloseBtn = document.getElementById("agendaCloseBtn");
-  var historialOverlay = document.getElementById("historialOverlay");
-  var historialModalBody = document.getElementById("historialModalBody");
-  var historialModalTitle = document.getElementById("historialModalTitle");
-  var historialCloseBtn = document.getElementById("historialCloseBtn");
   var contactBtn = document.getElementById("contactBtn");
   var contactOverlay = document.getElementById("contactOverlay");
   var contactModalBody = document.getElementById("contactModalBody");
@@ -1977,20 +1957,25 @@
     var body = crecimiento.body;
 
     var historial = crearSeccionPlegable("Historial de registros");
-    historial.headerBtn.style.display = "none"; // se muestra solo si hay mediciones
     bebeModalBody.appendChild(historial.headerBtn);
     bebeModalBody.appendChild(historial.body);
-    var histList = historial.body;
+    var histBody = historial.body;
 
     function cargar(){
       body.innerHTML = "<p style=\"color:var(--text-muted);font-size:.82rem;margin:0 0 14px;\">Cargando…</p>";
-      fetch("/api/bebe/crecimiento").then(function(r){ return r.json(); }).then(function(data){
-        var mediciones = data.mediciones || [];
+      histBody.innerHTML = "<p style=\"color:var(--text-muted);font-size:.82rem;margin:0;\">Cargando…</p>";
+      Promise.all([
+        fetch("/api/bebe/crecimiento").then(function(r){ return r.json(); }),
+        fetch("/api/bebe/notas").then(function(r){ return r.json(); }),
+      ]).then(function(resultados){
+        var mediciones = resultados[0].mediciones || [];
+        var notas = resultados[1].notas || [];
         pintarAvisoCrecimiento(avisoContainer, bebe, mediciones);
         pintarCrecimientoBody(body, bebe, mediciones, cargar);
-        pintarHistorialCrecimiento(historial.headerBtn, histList, bebe, mediciones, cargar);
+        pintarHistorialSeccion(histBody, bebe, mediciones, notas, cargar);
       }).catch(function(){
         body.innerHTML = "<p style=\"color:var(--danger-text);font-size:.82rem;margin:0 0 14px;\">No se pudo cargar el crecimiento. Intenta de nuevo.</p>";
+        histBody.innerHTML = "<p style=\"color:var(--danger-text);font-size:.82rem;margin:0;\">No se pudo cargar el historial. Intenta de nuevo.</p>";
       });
     }
     cargar();
@@ -2074,32 +2059,138 @@
 
   // Historial de registros — siempre visible (fuera del plegable), más
   // reciente primero.
-  function pintarHistorialCrecimiento(labelHist, histList, bebe, mediciones, reload){
-    histList.innerHTML = "";
-    if (!mediciones.length) { labelHist.style.display = "none"; return; }
-    labelHist.style.display = "";
-    mediciones.slice().reverse().forEach(function(m){
-      var row = document.createElement("div");
-      row.className = "crecimientoRow";
-      var partes = [];
-      if (m.peso_g) partes.push((m.peso_g / 1000).toFixed(2).replace(/\.?0+$/, "") + " kg");
-      if (m.talla_mm) partes.push((m.talla_mm / 10).toFixed(1) + " cm");
-      if (m.perimetro_cefalico_mm) partes.push("PC " + (m.perimetro_cefalico_mm / 10).toFixed(1) + " cm");
-      row.innerHTML = "<div class=\"datos\"><p class=\"fecha\">" + escapeHtml(fmtFecha(m.fecha)) + "</p>"
-        + "<p class=\"medidas\">" + escapeHtml(partes.join(" · ")) + (m.registrado_por_nombre ? " · " + escapeHtml(m.registrado_por_nombre) : "") + "</p></div>";
-      var delBtn = document.createElement("button");
-      delBtn.type = "button";
-      delBtn.textContent = "Borrar";
-      delBtn.addEventListener("click", function(){
-        if (!confirm("¿Borrar esta medición? No se puede deshacer.")) return;
-        delBtn.disabled = true;
-        fetch("/api/bebe/crecimiento/" + m.id, { method: "DELETE" }).then(function(r){ return r.json(); }).then(function(){
-          reload();
-        }).catch(function(){ delBtn.disabled = false; alert("No se pudo borrar. Intenta de nuevo."); });
+  // Cuerpo de "Historial de registros": las mediciones de crecimiento
+  // arriba, y debajo — dentro del mismo plegable, no en un modal aparte —
+  // los comentarios libres de los cuidadores (hitos, observaciones, lo que
+  // diga el pediatra). Es un primer paso simple, pensado para evolucionar
+  // más adelante hacia algo más estructurado tipo historia clínica.
+  var HISTORIAL_ERRORES = {
+    nota_vacia: "Escribe algo antes de guardar.",
+    nota_muy_larga: "El comentario es demasiado largo.",
+  };
+
+  function pintarHistorialSeccion(histBody, bebe, mediciones, notas, reload){
+    histBody.innerHTML = "";
+
+    if (mediciones.length) {
+      mediciones.slice().reverse().forEach(function(m){
+        var row = document.createElement("div");
+        row.className = "crecimientoRow";
+        var partes = [];
+        if (m.peso_g) partes.push((m.peso_g / 1000).toFixed(2).replace(/\.?0+$/, "") + " kg");
+        if (m.talla_mm) partes.push((m.talla_mm / 10).toFixed(1) + " cm");
+        if (m.perimetro_cefalico_mm) partes.push("PC " + (m.perimetro_cefalico_mm / 10).toFixed(1) + " cm");
+        row.innerHTML = "<div class=\"datos\"><p class=\"fecha\">" + escapeHtml(fmtFecha(m.fecha)) + "</p>"
+          + "<p class=\"medidas\">" + escapeHtml(partes.join(" · ")) + (m.registrado_por_nombre ? " · " + escapeHtml(m.registrado_por_nombre) : "") + "</p></div>";
+        var delBtn = document.createElement("button");
+        delBtn.type = "button";
+        delBtn.textContent = "Borrar";
+        delBtn.addEventListener("click", function(){
+          if (!confirm("¿Borrar esta medición? No se puede deshacer.")) return;
+          delBtn.disabled = true;
+          fetch("/api/bebe/crecimiento/" + m.id, { method: "DELETE" }).then(function(r){ return r.json(); }).then(function(){
+            reload();
+          }).catch(function(){ delBtn.disabled = false; alert("No se pudo borrar. Intenta de nuevo."); });
+        });
+        row.appendChild(delBtn);
+        histBody.appendChild(row);
       });
-      row.appendChild(delBtn);
-      histList.appendChild(row);
+    } else {
+      var vacioMed = document.createElement("p");
+      vacioMed.style.cssText = "color:var(--text-muted);font-size:.82rem;margin:0 0 10px;";
+      vacioMed.textContent = "Todavía no hay mediciones registradas.";
+      histBody.appendChild(vacioMed);
+    }
+
+    var sep = document.createElement("hr");
+    sep.style.cssText = "border:none;border-top:1px solid var(--border);margin:14px 0 12px;";
+    histBody.appendChild(sep);
+
+    var labelComentarios = document.createElement("label");
+    labelComentarios.textContent = "Comentarios";
+    histBody.appendChild(labelComentarios);
+
+    var introComentarios = document.createElement("p");
+    introComentarios.style.cssText = "margin:0 0 10px;font-size:.78rem;color:var(--text-muted);";
+    introComentarios.textContent = "Hitos u observaciones sobre " + (bebe.nombre || "tu bebé") + " que quieras recordar — compartido con los demás cuidadores vinculados.";
+    histBody.appendChild(introComentarios);
+
+    var fld = document.createElement("div");
+    fld.className = "fld";
+    var textarea = document.createElement("textarea");
+    textarea.rows = 3;
+    textarea.maxLength = 2000;
+    textarea.placeholder = "Ej: Hoy sonrió por primera vez, o: el pediatra dijo que sigamos igual con la lactancia...";
+    fld.appendChild(textarea);
+    histBody.appendChild(fld);
+
+    var errorMsg = document.createElement("p");
+    errorMsg.style.cssText = "color:var(--danger-text);font-size:.78rem;margin:0 0 10px;display:none;";
+    histBody.appendChild(errorMsg);
+
+    var guardarBtn = document.createElement("button");
+    guardarBtn.type = "button";
+    guardarBtn.className = "btnPrimary";
+    guardarBtn.style.marginBottom = "16px";
+    guardarBtn.textContent = "Guardar comentario";
+    guardarBtn.addEventListener("click", function(){
+      var texto = textarea.value.trim();
+      errorMsg.style.display = "none";
+      if (!texto) {
+        errorMsg.textContent = HISTORIAL_ERRORES.nota_vacia;
+        errorMsg.style.display = "block";
+        return;
+      }
+      guardarBtn.disabled = true;
+      fetch("/api/bebe/notas", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texto: texto }),
+      }).then(function(r){ return r.json().then(function(data){ return { ok: r.ok, data: data }; }); })
+        .then(function(res){
+          guardarBtn.disabled = false;
+          if (!res.ok || !res.data.ok) {
+            errorMsg.textContent = HISTORIAL_ERRORES[res.data.error] || "No se pudo guardar. Intenta de nuevo.";
+            errorMsg.style.display = "block";
+            return;
+          }
+          reload();
+        }).catch(function(){
+          guardarBtn.disabled = false;
+          errorMsg.textContent = "No se pudo guardar. Intenta de nuevo.";
+          errorMsg.style.display = "block";
+        });
     });
+    histBody.appendChild(guardarBtn);
+
+    if (!notas.length) {
+      var vacioNotas = document.createElement("p");
+      vacioNotas.style.cssText = "color:var(--text-muted);font-size:.82rem;";
+      vacioNotas.textContent = "Todavía no hay comentarios.";
+      histBody.appendChild(vacioNotas);
+    } else {
+      notas.slice().reverse().forEach(function(n){
+        var row = document.createElement("div");
+        row.className = "notaRow";
+        row.innerHTML = "<div class=\"meta\"><span class=\"autor\">" + escapeHtml(n.autor_nombre || "Cuidador") + "</span>"
+          + "<span class=\"fecha\">" + escapeHtml(fmtFecha(n.created_at ? n.created_at.slice(0, 10) : "")) + "</span></div>"
+          + "<p class=\"texto\"></p>";
+        row.querySelector(".texto").textContent = n.texto;
+        var delBtnNota = document.createElement("button");
+        delBtnNota.type = "button";
+        delBtnNota.className = "borrarNota";
+        delBtnNota.textContent = "Borrar";
+        delBtnNota.addEventListener("click", function(){
+          if (!confirm("¿Borrar este comentario? No se puede deshacer.")) return;
+          delBtnNota.disabled = true;
+          fetch("/api/bebe/notas/" + n.id, { method: "DELETE" }).then(function(r){ return r.json(); }).then(function(){
+            reload();
+          }).catch(function(){ delBtnNota.disabled = false; alert("No se pudo borrar. Intenta de nuevo."); });
+        });
+        row.appendChild(delBtnNota);
+        histBody.appendChild(row);
+      });
+    }
   }
 
   var CRECIMIENTO_ERRORES = {
@@ -2779,139 +2870,6 @@
   menuAgenda.addEventListener("click", function(){ closeMoreMenuAnd(openAgendaModal); });
   agendaCloseBtn.addEventListener("click", function(){ limpiarFab(); agendaOverlay.classList.add("hidden"); });
   agendaOverlay.addEventListener("click", function(ev){ if (ev.target === agendaOverlay) { limpiarFab(); agendaOverlay.classList.add("hidden"); } });
-
-  // ---- Historial del bebé: notas libres de los cuidadores ----------------
-  // Tercer modal, separado de "Perfil del bebé" y "Agenda". Por ahora es
-  // una caja de texto con lo que los papás quieran anotar (un primer paso
-  // hacia algo más estructurado tipo historia clínica, a definir después) —
-  // no interpretamos ni clasificamos el texto, solo lo guardamos y listamos.
-  var HISTORIAL_ERRORES = {
-    sin_perfil: "Primero crea el perfil del bebé.",
-    nota_vacia: "Escribe algo antes de guardar.",
-    nota_muy_larga: "El comentario es demasiado largo.",
-  };
-
-  function openHistorialModal(){
-    historialOverlay.classList.remove("hidden");
-    if (!loggedIn) { requiereLogin(historialModalBody); return; }
-    historialModalTitle.textContent = "Historial";
-    historialModalBody.innerHTML = "<p style=\"color:var(--text-muted);font-size:.86rem;\">Cargando…</p>";
-    fetch("/api/bebe").then(function(r){ return r.json(); }).then(function(data){
-      if (!data.bebe) {
-        historialModalBody.innerHTML = "<p style=\"color:var(--text-muted);font-size:.86rem;\">Primero crea el perfil del bebé desde \"Perfil del bebé\" en el menú.</p>";
-        return;
-      }
-      historialModalTitle.textContent = "Historial de " + (data.bebe.nombre || "tu bebé");
-      renderHistorialModal(data.bebe);
-    }).catch(function(){
-      historialModalBody.innerHTML = "<p style=\"color:var(--danger-text);font-size:.86rem;\">No se pudo cargar el historial. Intenta de nuevo.</p>";
-    });
-  }
-
-  function renderHistorialModal(bebe){
-    historialModalBody.innerHTML = "";
-
-    var intro = document.createElement("p");
-    intro.style.cssText = "margin:0 0 14px;font-size:.82rem;color:var(--text-muted);";
-    intro.textContent = "Anota lo que quieras recordar sobre " + (bebe.nombre || "tu bebé") + ": hitos, observaciones, lo que te diga el pediatra. Es un espacio libre, compartido con los demás cuidadores vinculados.";
-    historialModalBody.appendChild(intro);
-
-    var fld = document.createElement("div");
-    fld.className = "fld";
-    fld.innerHTML = "<label>Nuevo comentario</label>";
-    var textarea = document.createElement("textarea");
-    textarea.rows = 4;
-    textarea.maxLength = 2000;
-    textarea.placeholder = "Ej: Hoy sonrió por primera vez, o: el pediatra dijo que sigamos igual con la lactancia...";
-    fld.appendChild(textarea);
-    historialModalBody.appendChild(fld);
-
-    var errorMsg = document.createElement("p");
-    errorMsg.style.cssText = "color:var(--danger-text);font-size:.78rem;margin:0 0 10px;display:none;";
-    historialModalBody.appendChild(errorMsg);
-
-    var guardarBtn = document.createElement("button");
-    guardarBtn.type = "button";
-    guardarBtn.className = "btnPrimary";
-    guardarBtn.style.marginBottom = "18px";
-    guardarBtn.textContent = "Guardar comentario";
-    guardarBtn.addEventListener("click", function(){
-      var texto = textarea.value.trim();
-      errorMsg.style.display = "none";
-      if (!texto) {
-        errorMsg.textContent = HISTORIAL_ERRORES.nota_vacia;
-        errorMsg.style.display = "block";
-        return;
-      }
-      guardarBtn.disabled = true;
-      fetch("/api/bebe/notas", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ texto: texto }),
-      }).then(function(r){ return r.json().then(function(data){ return { ok: r.ok, data: data }; }); })
-        .then(function(res){
-          guardarBtn.disabled = false;
-          if (!res.ok || !res.data.ok) {
-            errorMsg.textContent = HISTORIAL_ERRORES[res.data.error] || "No se pudo guardar. Intenta de nuevo.";
-            errorMsg.style.display = "block";
-            return;
-          }
-          textarea.value = "";
-          cargarNotas();
-        }).catch(function(){
-          guardarBtn.disabled = false;
-          errorMsg.textContent = "No se pudo guardar. Intenta de nuevo.";
-          errorMsg.style.display = "block";
-        });
-    });
-    historialModalBody.appendChild(guardarBtn);
-
-    var listaWrap = document.createElement("div");
-    historialModalBody.appendChild(listaWrap);
-
-    function cargarNotas(){
-      listaWrap.innerHTML = "<p style=\"color:var(--text-muted);font-size:.82rem;\">Cargando…</p>";
-      fetch("/api/bebe/notas").then(function(r){ return r.json(); }).then(function(data){
-        pintarNotas(listaWrap, data.notas || [], cargarNotas);
-      }).catch(function(){
-        listaWrap.innerHTML = "<p style=\"color:var(--danger-text);font-size:.82rem;\">No se pudo cargar el historial. Intenta de nuevo.</p>";
-      });
-    }
-    cargarNotas();
-  }
-
-  function pintarNotas(listaWrap, notas, reload){
-    listaWrap.innerHTML = "";
-    if (!notas.length) {
-      listaWrap.innerHTML = "<p style=\"color:var(--text-muted);font-size:.82rem;\">Todavía no hay comentarios.</p>";
-      return;
-    }
-    notas.slice().reverse().forEach(function(n){
-      var row = document.createElement("div");
-      row.className = "notaRow";
-      row.innerHTML = "<div class=\"meta\"><span class=\"autor\">" + escapeHtml(n.autor_nombre || "Cuidador") + "</span>"
-        + "<span class=\"fecha\">" + escapeHtml(fmtFecha(n.created_at ? n.created_at.slice(0, 10) : "")) + "</span></div>"
-        + "<p class=\"texto\"></p>";
-      row.querySelector(".texto").textContent = n.texto;
-      var delBtn = document.createElement("button");
-      delBtn.type = "button";
-      delBtn.className = "borrarNota";
-      delBtn.textContent = "Borrar";
-      delBtn.addEventListener("click", function(){
-        if (!confirm("¿Borrar este comentario? No se puede deshacer.")) return;
-        delBtn.disabled = true;
-        fetch("/api/bebe/notas/" + n.id, { method: "DELETE" }).then(function(r){ return r.json(); }).then(function(){
-          reload();
-        }).catch(function(){ delBtn.disabled = false; alert("No se pudo borrar. Intenta de nuevo."); });
-      });
-      row.appendChild(delBtn);
-      listaWrap.appendChild(row);
-    });
-  }
-
-  menuHistorial.addEventListener("click", function(){ closeMoreMenuAnd(openHistorialModal); });
-  historialCloseBtn.addEventListener("click", function(){ historialOverlay.classList.add("hidden"); });
-  historialOverlay.addEventListener("click", function(ev){ if (ev.target === historialOverlay) historialOverlay.classList.add("hidden"); });
 
   // --- Sonidos para dormir: ruido blanco/rosa/marrón + canción de cuna ---
   // Todo se reproduce con elementos <audio> reales (no Web Audio API en
