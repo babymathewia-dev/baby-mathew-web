@@ -836,7 +836,11 @@
   // sirven de verdad (más allá de lo que detectamos probando manualmente).
   // Envía la pregunta + la respuesta completa; best-effort (si falla el envío
   // no interrumpe nada, simplemente no queda registrado ese voto).
-  function addFeedbackButtons(el, questionText, answerText){
+  // refNode (opcional): si se da, wrap se inserta ANTES de ese nodo dentro de
+  // "el" (para colarse a la izquierda de los íconos de copiar/compartir
+  // dentro de la misma fila .msgActions ya existente); si no, se agrega al
+  // final como antes.
+  function addFeedbackButtons(el, questionText, answerText, refNode){
     if (!answerText) return;
     var wrap = document.createElement("div");
     wrap.className = "feedbackBtns";
@@ -865,7 +869,7 @@
     down.addEventListener("click", function(){ enviar("down", down); });
     wrap.appendChild(up);
     wrap.appendChild(down);
-    el.appendChild(wrap);
+    if (refNode) { el.insertBefore(wrap, refNode); } else { el.appendChild(wrap); }
   }
 
   // Pinta el contenido final de un mensaje del bot. Si el texto es largo,
@@ -1267,8 +1271,18 @@
           // o ya expandido si la persona hizo clic antes de que terminara) —
           // no se vuelve a tocar su innerHTML ni se reancla el scroll, para
           // no interrumpir la lectura; los botones de feedback se agregan
-          // aparte (appendChild) sobre ese mismo estado.
-          addFeedbackButtons(botEl, feedbackRef.value.question, feedbackRef.value.answer);
+          // aparte, sobre ese mismo estado. La fila .msgActions ya existe (la
+          // creó renderMessageActions con el feedback aún en null, solo con
+          // los íconos de copiar/compartir) — hay que insertar los 👍/👎
+          // DENTRO de esa misma fila, antes de .msgOptions, en vez de
+          // agregarlos como una fila nueva aparte (eso dejaba los íconos en
+          // una línea y las manitos en otra, desalineados).
+          var actionsEl = botEl.querySelector(".msgActions");
+          if (actionsEl) {
+            addFeedbackButtons(actionsEl, feedbackRef.value.question, feedbackRef.value.answer, actionsEl.firstChild);
+          } else {
+            addFeedbackButtons(botEl, feedbackRef.value.question, feedbackRef.value.answer);
+          }
         }
         turns.push({ role: "assistant", content: accumulated });
         saveHistory();
