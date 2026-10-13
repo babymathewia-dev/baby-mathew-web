@@ -1,8 +1,8 @@
 # Base de conocimiento — Gestación (semanas 1 a 40)
 
-Fuentes de referencia: OMS (Recomendaciones sobre atención prenatal para una experiencia positiva del embarazo, 2018), Guías de Práctica Clínica Colombia — Resolución 3280 de 2018 (Minsalud), Academia Americana de Pediatría (AAP), Asociación Española de Pediatría (AEP), ACOG (American College of Obstetricians and Gynecologists), Guías Alimentarias Basadas en Alimentos para mujeres gestantes, madres en período de lactancia y niños y niñas menores de 2 años para Colombia — ICBF (Instituto Colombiano de Bienestar Familiar).
+Fuentes de referencia: OMS (Recomendaciones sobre atención prenatal para una experiencia positiva del embarazo, 2018), Guías de Práctica Clínica Colombia — Resolución 3280 de 2018 (Minsalud), Academia Americana de Pediatría (AAP), Asociación Española de Pediatría (AEP), ACOG (American College of Obstetricians and Gynecologists), Guías Alimentarias Basadas en Alimentos para mujeres gestantes, madres en período de lactancia y niños y niñas menores de 2 años para Colombia — ICBF (Instituto Colombiano de Bienestar Familiar). Ley 1822 de 2017 y Código Sustantivo del Trabajo de Colombia (licencia de maternidad y paternidad, fuero de maternidad). Guías generales de acompañamiento en duelo perinatal (OMS, March of Dimes).
 
-Última revisión de vigencia de fuentes: 2026-09-27.
+Última revisión de vigencia de fuentes: 2026-10-13.
 
 > Nota de uso: este documento es material de referencia para orientar respuestas conversacionales. No sustituye consulta médica. Toda señal de alarma listada aquí debe activar el protocolo de emergencia del system prompt, no una respuesta informativa extendida.
 
@@ -142,6 +142,65 @@ Fuentes de referencia: OMS (Recomendaciones sobre atención prenatal para una ex
 
 ---
 
+## Ejercicio y actividad física en el embarazo
+
+**Qué es seguro (embarazo de bajo riesgo, sin contraindicación del médico):**
+- Caminar, nadar, bicicleta estática, yoga prenatal y pilates prenatal son actividades generalmente seguras y recomendadas durante todo el embarazo.
+- La recomendación general (ACOG/OMS) es acumular al menos 150 minutos de actividad física moderada a la semana, repartidos en varios días, si no hay contraindicación.
+- Es normal necesitar ajustar la intensidad a medida que avanza el embarazo — la meta es mantenerse activa, no alcanzar un rendimiento.
+
+**Señales para detenerse y consultar:**
+- Sangrado vaginal, mareo intenso, dolor de pecho, contracciones, salida de líquido, o dificultad para respirar durante el ejercicio.
+
+**Qué evitar:**
+- Deportes de contacto o con alto riesgo de caída (artes marciales, esquí, ciclismo en terreno irregular), buceo, ejercicios boca arriba prolongados después del primer trimestre (pueden comprimir la vena cava), y actividad física intensa en climas muy calurosos sin hidratación adecuada.
+
+**Orientación del agente:** puede dar estas pautas generales, pero cualquier rutina de ejercicio adaptada a una condición médica específica (hipertensión, diabetes gestacional, embarazo de alto riesgo) debe consultarse con el médico tratante antes de iniciar o continuar.
+
+---
+
+## Duelo gestacional y pérdida perinatal
+
+**Qué es:** la pérdida de un embarazo (aborto espontáneo, muerte fetal) o de un recién nacido es una experiencia de duelo real y profunda, no "algo que superar rápido" ni algo que minimizar por la edad gestacional.
+
+**Orientación general:**
+- Validar el dolor sin matizarlo ("al menos ya tienes otro hijo", "era muy pronto") — cualquier pérdida, en cualquier etapa, es válida de llorar.
+- Es común sentir una mezcla de tristeza, culpa (aunque no haya causa identificable atribuible a la madre), rabia o vacío — no hay una forma "correcta" de vivir el duelo ni un tiempo fijo para superarlo.
+- Buscar acompañamiento (pareja, familia, grupos de apoyo de duelo gestacional, o un profesional de salud mental) ayuda a procesar la pérdida; no es necesario atravesarlo en soledad.
+
+**El agente:**
+- Puede acompañar con empatía y validar la experiencia, pero no ofrece terapia de duelo ni sustituye el acompañamiento psicológico profesional.
+- Si la persona expresa pensamientos de autolesión o de hacerse daño, activa el protocolo de emergencia igual que en cualquier otro momento del embarazo o posparto.
+
+---
+
+## Derechos laborales y licencia de maternidad (Colombia)
+
+**Licencia de maternidad:**
+- En Colombia, la licencia de maternidad remunerada es de 18 semanas (Ley 1822 de 2017), que se pueden distribuir total o parcialmente antes y después del parto según lo acuerde la trabajadora con su empleador, dentro de las reglas vigentes.
+- El padre tiene derecho a licencia de paternidad remunerada — el agente debe orientar que este derecho existe, pero remitir siempre a la EPS o a talento humano de la empresa para confirmar la duración exacta vigente, por el riesgo de que la norma cambie.
+
+**Fuero de maternidad:**
+- La trabajadora embarazada o en licencia de maternidad tiene protección especial contra el despido (fuero de maternidad); un despido sin autorización del Ministerio de Trabajo durante este periodo puede ser impugnado.
+
+**Orientación del agente:** puede explicar estos derechos de forma general, pero cualquier caso puntual (un despido, una negociación con el empleador, una incapacidad prolongada) debe remitirse a la EPS/ARL, a talento humano, o a asesoría legal laboral — el agente no sustituye esa asesoría.
+
+---
+
+## Preparación prenatal para la lactancia
+
+**Qué es útil hacer antes de que nazca el bebé:**
+- Informarse sobre la lactancia (agarre, posiciones, frecuencia esperada) ayuda a llegar con más confianza, aunque la práctica real se aprende con el bebé.
+- Si el sistema de salud ofrece asesoría de lactancia prenatal o curso psicoprofiláctico con ese componente, puede ser de ayuda.
+- No es necesario "preparar" los pezones con técnicas caseras (frotar, estirar) — no hay evidencia de que esto mejore la lactancia y puede ser innecesariamente incómodo.
+
+**Qué NO es necesario:**
+- Comprar grandes cantidades de fórmula "por si acaso" no es necesario si la intención es amamantar — se puede evaluar según cómo progrese la lactancia tras el parto.
+
+**Orientación del agente:** para el detalle práctico de la lactancia ya con el bebé en brazos (agarre, frecuencia, cólicos), remite a la etapa de lactante (0-6 meses) — aquí solo se trata la preparación previa al parto.
+
+---
+
 ## Señales de alarma en gestación (resumen — deben activar el protocolo de emergencia del system prompt, no responderse aquí)
 
 - Sangrado vaginal abundante
@@ -161,3 +220,6 @@ Fuentes de referencia: OMS (Recomendaciones sobre atención prenatal para una ex
 - Interpretación de resultados de laboratorio o ecografías.
 - Indicación de medicamentos, incluidos analgésicos de venta libre.
 - Diagnóstico de depresión o ansiedad perinatal/posparto — solo puede orientar de forma general y remitir a valoración profesional.
+- Rutinas de ejercicio personalizadas o adaptadas a una condición médica específica (hipertensión, diabetes gestacional, embarazo de alto riesgo) — remitir siempre al médico tratante.
+- Asesoría legal laboral de un caso puntual (despido, negociación, disputa) — remitir a asesoría legal o a la EPS/ARL según corresponda.
+- Terapia o acompañamiento psicológico de duelo gestacional — el agente valida y acompaña, pero no sustituye el apoyo profesional.

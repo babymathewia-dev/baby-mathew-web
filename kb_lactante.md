@@ -1,8 +1,8 @@
 # Base de conocimiento — Lactante menor (0 a 6 meses)
 
-Fuentes de referencia: OMS/UNICEF (recomendaciones de lactancia materna exclusiva hasta los 6 meses), Academia Americana de Pediatría (AAP — Safe Sleep guidelines), Asociación Española de Pediatría (AEP), Guías de Práctica Clínica Colombia — Resolución 3280 de 2018 (Minsalud), Ministerio de Salud de Colombia — esquema de vacunación PAI (Lineamientos de gestión y administración PAI 2026), Guías Alimentarias Basadas en Alimentos para mujeres gestantes, madres en período de lactancia y niños y niñas menores de 2 años para Colombia — ICBF (Instituto Colombiano de Bienestar Familiar).
+Fuentes de referencia: OMS/UNICEF (recomendaciones de lactancia materna exclusiva hasta los 6 meses), Academia Americana de Pediatría (AAP — Safe Sleep guidelines), Asociación Española de Pediatría (AEP), Guías de Práctica Clínica Colombia — Resolución 3280 de 2018 (Minsalud), Ministerio de Salud de Colombia — esquema de vacunación PAI (Lineamientos de gestión y administración PAI 2026), Guías Alimentarias Basadas en Alimentos para mujeres gestantes, madres en período de lactancia y niños y niñas menores de 2 años para Colombia — ICBF (Instituto Colombiano de Bienestar Familiar). AAP (alimentación con fórmula infantil y uso seguro del chupete). CDC (pautas de extracción y conservación de leche materna).
 
-Última revisión de vigencia de fuentes: 2026-09-27.
+Última revisión de vigencia de fuentes: 2026-10-13.
 
 > Nota de uso: este documento es material de referencia para orientar respuestas conversacionales. No sustituye consulta médica ni control de crecimiento y desarrollo. Toda señal de alarma listada aquí debe activar el protocolo de emergencia del system prompt, no una respuesta informativa extendida.
 
@@ -92,6 +92,60 @@ Fuentes de referencia: OMS/UNICEF (recomendaciones de lactancia materna exclusiv
 
 ---
 
+## Fórmula infantil y lactancia mixta
+
+**Cuándo se usa:**
+- La fórmula infantil es una alternativa nutricionalmente adecuada cuando la lactancia materna exclusiva no es posible, no es suficiente, o no es la decisión de la familia — es una decisión válida y personal, no motivo de culpa.
+- La lactancia mixta (pecho + fórmula) también es una opción común y segura cuando se busca complementar la producción de leche o facilitar la organización familiar.
+
+**Preparación segura del biberón:**
+- Lavar bien las manos y esterilizar biberones y tetinas (hervir 5 minutos o usar esterilizador) especialmente en los primeros meses.
+- Seguir exactamente la proporción agua:fórmula indicada en el empaque — ni diluir de más (afecta la nutrición) ni concentrar de más (sobrecarga los riñones del bebé).
+- Usar agua potable; si hay duda sobre la calidad del agua, hervirla y dejarla enfriar a temperatura tibia antes de preparar.
+- Preparar cada toma justo antes de ofrecerla; no guardar fórmula ya preparada y sobrante más de 1-2 horas a temperatura ambiente, ni reutilizar restos de una toma anterior.
+
+**Frecuencia y cantidad:**
+- Similar a la lactancia materna: a libre demanda, siguiendo las señales de hambre y saciedad del bebé, no un horario rígido. La cantidad por toma varía según la edad y el bebé — el pediatra orienta cantidades de referencia en los controles de crecimiento.
+
+**Orientación del agente:** puede explicar estas pautas generales de preparación y uso, pero no recomienda una marca o tipo específico de fórmula (de inicio, hidrolizada, sin lactosa, etc.) — eso corresponde siempre al pediatra, especialmente si hay sospecha de intolerancia o alergia.
+
+---
+
+## Extracción y conservación de leche materna
+
+**Extracción:**
+- Se puede extraer con sacaleches manual o eléctrico, o extracción manual — la elección depende de la comodidad y frecuencia de uso de cada madre.
+- Es normal que la cantidad extraída varíe de una sesión a otra y no refleje necesariamente la producción total de leche.
+
+**Conservación (pautas generales, CDC/AAP):**
+- Temperatura ambiente (hasta 25°C): hasta 4 horas.
+- Refrigerador: hasta 4 días.
+- Congelador: hasta 6-12 meses (varía según el tipo de congelador; un compartimento independiente conserva mejor que uno dentro del refrigerador).
+- Descongelar en el refrigerador la noche anterior o bajo agua tibia corriente — nunca en microondas (calienta de forma despareja y puede quemar al bebé, además de destruir componentes de la leche).
+- La leche descongelada no debe volver a congelarse.
+
+**Orientación del agente:** estas son pautas generales de referencia; ante cualquier duda sobre si la leche sigue siendo segura (olor, color, tiempo transcurrido), la recomendación práctica es descartarla.
+
+---
+
+## Chupete (opcional, con beneficio documentado)
+
+- La AAP recomienda ofrecer chupete a la hora de dormir (siesta y noche) desde el primer mes de vida (una vez establecida la lactancia, usualmente hacia las 3-4 semanas), porque se asocia con una reducción del riesgo de muerte súbita del lactante (SIDS).
+- No es obligatorio — si el bebé lo rechaza, no hay que forzarlo.
+- Elegir un chupete de una sola pieza, de tamaño adecuado para la edad, y no cubrirlo con azúcar, miel u otras sustancias.
+- No es necesario preocuparse por "cambiar de hábito" antes de los 6 meses; el retiro gradual del chupete suele abordarse más adelante (después del año).
+
+---
+
+## Piel del recién nacido: variaciones frecuentes
+
+- **Costra láctea (dermatitis seborreica):** escamas amarillentas o costras en el cuero cabelludo, frecuente y no indica mala higiene. Masajear con aceite suave o vaselina antes del baño y cepillar suavemente ayuda a aflojarla; mejora sola en semanas o pocos meses.
+- **Milia:** puntitos blancos pequeños en la nariz o cara, por glándulas sebáceas inmaduras — desaparecen solos en pocas semanas, no se deben exprimir.
+- **Acné neonatal:** granitos rojos o con punta blanca en la cara, por hormonas maternas residuales — aparece hacia las 2-4 semanas y se resuelve solo en 1-3 meses; no requiere crema ni tratamiento.
+- **Cuándo consultar:** si hay signos de infección (pus, calor, hinchazón marcada, fiebre) o si cualquiera de estas condiciones no mejora o empeora claramente con el tiempo.
+
+---
+
 ## Señales de alarma en el lactante (resumen — deben activar el protocolo de emergencia del system prompt, no responderse aquí)
 
 - Fiebre en menor de 3 meses (≥ 38°C)
@@ -113,3 +167,5 @@ Fuentes de referencia: OMS/UNICEF (recomendaciones de lactancia materna exclusiv
 - Indicación de medicamentos o dosis (incluidos antipiréticos de venta libre).
 - Interpretación de resultados de exámenes o valoraciones de crecimiento (percentiles) — remitir al control de crecimiento y desarrollo.
 - Alimentación complementaria más allá de los 6 meses (fuera del alcance temporal del MVP).
+- Recomendación de marca, tipo o cambio de fórmula infantil — remitir siempre al pediatra.
+- Diagnóstico de intolerancia o alergia a la leche materna o a la fórmula.

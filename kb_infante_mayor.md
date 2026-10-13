@@ -1,8 +1,8 @@
 # Base de conocimiento — Infante mayor (6 a 24 meses)
 
-Fuentes de referencia: OMS/UNICEF (alimentación complementaria), Academia Americana de Pediatría (AAP), Asociación Española de Pediatría (AEP), Guías de Práctica Clínica Colombia — Resolución 3280 de 2018 (Minsalud), Ministerio de Salud de Colombia — esquema de vacunación PAI (Lineamientos de gestión y administración PAI 2026), CDC (hitos de desarrollo y seguridad infantil), Guías Alimentarias Basadas en Alimentos para mujeres gestantes, madres en período de lactancia y niños y niñas menores de 2 años para Colombia — ICBF (Instituto Colombiano de Bienestar Familiar).
+Fuentes de referencia: OMS/UNICEF (alimentación complementaria), Academia Americana de Pediatría (AAP), Asociación Española de Pediatría (AEP), Guías de Práctica Clínica Colombia — Resolución 3280 de 2018 (Minsalud), Ministerio de Salud de Colombia — esquema de vacunación PAI (Lineamientos de gestión y administración PAI 2026), CDC (hitos de desarrollo y seguridad infantil), Guías Alimentarias Basadas en Alimentos para mujeres gestantes, madres en período de lactancia y niños y niñas menores de 2 años para Colombia — ICBF (Instituto Colombiano de Bienestar Familiar). AAP / AAPD (salud bucal temprana).
 
-Última revisión de vigencia de fuentes: 2026-09-27.
+Última revisión de vigencia de fuentes: 2026-10-13.
 
 > Nota de uso: este documento es material de referencia para orientar respuestas conversacionales. No sustituye consulta médica ni control de crecimiento y desarrollo. Toda señal de alarma listada aquí debe activar el protocolo de emergencia del system prompt, no una respuesta informativa extendida.
 
@@ -110,6 +110,68 @@ Fuentes de referencia: OMS/UNICEF (alimentación complementaria), Academia Ameri
 
 ---
 
+## Selectividad alimentaria ("ya no quiere comer")
+
+**Qué es esperable:**
+- Es muy común que, alrededor del primer año, el apetito disminuya notoriamente en comparación con los meses anteriores — el ritmo de crecimiento se desacelera después del primer año, así que el niño necesita relativamente menos comida de la que los padres esperan.
+- La neofobia alimentaria (rechazo a alimentos nuevos o desconocidos) es una etapa normal del desarrollo, frecuente entre 1 y 3 años — no es un problema a "corregir" de inmediato.
+- Preferir pocos alimentos repetidos, rechazar texturas o colores, o comer distinto día a día, es parte del comportamiento típico de esta edad.
+
+**Orientación general:**
+- Ofrecer el alimento nuevo varias veces (puede tomar 8-10 exposiciones antes de que un niño lo acepte) sin forzar ni presionar a comer.
+- Mantener horarios de comida regulares, en familia si es posible, sin pantallas, confiando en que el niño regula su propio apetito.
+- No usar la comida como premio o castigo, ni negociar ("si comes esto, te doy postre") de forma sistemática — refuerza una relación poco saludable con la comida a largo plazo.
+- Ofrecer el mismo menú familiar (ajustado en tamaño/textura) en vez de preparar comidas distintas para el niño ayuda a normalizar la variedad.
+
+**Cuándo consultar:**
+- Si la restricción es tan severa que limita grupos enteros de alimentos de forma persistente, hay pérdida de peso, o la hora de comer genera angustia intensa y sostenida para el niño o la familia — ahí sí amerita valoración con el pediatra o nutrición.
+
+---
+
+## Destete (del pecho o del biberón)
+
+**Qué es esperable:**
+- No hay una edad "correcta" para destetar — la OMS recomienda continuar la lactancia hasta los 2 años o más si madre e hijo lo desean, junto con la alimentación complementaria.
+- El destete puede ser gradual (ir espaciando tomas) o decidido por el niño mismo con el tiempo; ambos son válidos.
+
+**Orientación general:**
+- Un destete gradual suele ser más cómodo tanto para la madre (evita congestión mamaria) como para el niño (menos brusco emocionalmente).
+- Mantener contacto físico y rutinas de cariño que no dependan de la toma ayuda en la transición, especialmente si el pecho también cumplía una función de consuelo.
+- Para el biberón, la transición a vaso/taza suele iniciarse alrededor del año.
+
+**Orientación del agente:** puede dar estas pautas generales; un destete motivado por una condición médica de la madre, o cualquier dificultad física durante el proceso (dolor, signos de mastitis), debe remitirse al médico o a un consultor de lactancia.
+
+---
+
+## Salud bucal temprana
+
+**Cuidado desde el primer diente:**
+- Limpiar las encías con una gasa húmeda incluso antes de que salgan los dientes ayuda a crear el hábito.
+- Desde que aparece el primer diente, cepillar 2 veces al día con un cepillo de cerdas suaves y una cantidad de pasta dental con flúor del tamaño de un grano de arroz (hasta los 3 años).
+- Evitar que el bebé se duerma con el biberón de leche o jugo en la boca — el contacto prolongado con azúcares favorece la caries de la primera infancia.
+
+**Primera visita al odontólogo:**
+- Las guías (AAP, odontología pediátrica) recomiendan la primera visita al odontólogo alrededor del primer año de vida, o dentro de los 6 meses posteriores a la salida del primer diente.
+
+**Orientación del agente:** puede dar estas pautas generales de higiene y prevención, pero el diagnóstico o tratamiento de caries u otras alteraciones dentales corresponde siempre al odontólogo pediátrico.
+
+---
+
+## Adaptación al jardín infantil o guardería
+
+**Qué es esperable:**
+- Es normal que el inicio del jardín coincida con un periodo de llanto al separarse, mayor irritabilidad o incluso regresiones temporales de sueño — la angustia de separación es una etapa normal del desarrollo (ver sección de comportamiento).
+- La adaptación suele tomar entre 1 y 3 semanas, con variabilidad amplia según el niño.
+
+**Orientación general:**
+- Una despedida breve, cálida y consistente (evitar despedidas prolongadas o escabullirse sin avisar) ayuda a que el niño confíe en que el cuidador siempre vuelve.
+- Mantener una rutina predecible en casa durante el periodo de adaptación da estabilidad.
+- Es esperable un aumento temporal de contagios de enfermedades comunes (resfriados, virus) al iniciar la vida en comunidad — no es un signo de que algo esté mal con el niño o el jardín.
+
+**Cuándo consultar:** si pasadas varias semanas el niño no logra ningún grado de adaptación, muestra retroceso marcado y sostenido en el desarrollo, o hay señales de que algo ocurre en el jardín que preocupa a la familia.
+
+---
+
 ## Señales de alarma en el infante mayor (6-24 meses) — resumen (deben activar el protocolo de emergencia del system prompt, no responderse aquí)
 
 - Dificultad para respirar, quejido, cianosis (color azulado en labios o piel).
@@ -132,3 +194,6 @@ Fuentes de referencia: OMS/UNICEF (alimentación complementaria), Academia Ameri
 - Interpretación de resultados de exámenes o percentiles de crecimiento — remitir al control de crecimiento y desarrollo.
 - Planes de alimentación o esquemas de introducción alergénica personalizados — remitir a nutrición pediátrica cuando el caso lo amerite (por ejemplo, antecedentes familiares de alergias severas).
 - Orientación más allá de los 24 meses (fuera del alcance temporal de este MVP).
+- Diagnóstico de un trastorno de alimentación selectiva severo (por ejemplo ARFID) — remitir a valoración si la restricción es extrema o hay pérdida de peso.
+- Diagnóstico o tratamiento de caries u otras alteraciones dentales — remitir al odontólogo pediátrico.
+- Recomendación sobre la elección específica de jardín infantil o su calidad — es una decisión familiar fuera del alcance clínico del agente.
