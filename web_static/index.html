@@ -125,6 +125,9 @@
     font-family:"Baloo 2","Source Sans 3",sans-serif; font-weight:700; font-size:.68rem;
     letter-spacing:.04em; text-transform:uppercase; color:var(--text-muted);
   }
+  /* La primera etiqueta ("Sobre Baby Mathew") va justo debajo del
+     encabezado del menú, sin línea divisoria encima. */
+  #sideMenu > .sideMenuLabel:first-of-type{border-top:none; margin-top:10px;}
   #sideMenuInfo{flex:0 0 auto; padding:2px 10px 18px; display:flex; flex-direction:column; gap:6px;}
   .menuAccordion{border:none; background:none; padding:0; margin:0;}
   .menuAccordion summary{
@@ -531,8 +534,14 @@
   .lCard .lIcon{font-size:1.6rem;}
   .lCard h3{font-family:"Baloo 2","Source Sans 3",sans-serif; font-size:1.02rem; color:var(--text); margin:0;}
   .lCard p{font-size:.85rem; line-height:1.55; color:var(--text-muted); margin:0;}
+  /* Tarjetas de "Temas por etapa" y preguntas del FAQ: ahora son botones que
+     envían la pregunta al chat (ver JS), así que se resetea su apariencia
+     por-defecto de <button> sin tocar el resto del estilo visual. */
+  button.lCard, button.lFaqItem{font:inherit; text-align:left; width:100%; margin:0;}
+  button.lCard:hover, button.lCard:focus-visible{border-color:var(--primary);}
+  button.lFaqItem:hover h3, button.lFaqItem:focus-visible h3{color:var(--primary-dark);}
   .lFaq{max-width:680px; margin:26px auto 0; display:flex; flex-direction:column; gap:16px;}
-  .lFaqItem{border-bottom:1px solid var(--border); padding-bottom:16px;}
+  .lFaqItem{border-bottom:1px solid var(--border); padding-bottom:16px; background:none; border-left:none; border-right:none; border-top:none;}
   .lFaqItem:last-child{border-bottom:none; padding-bottom:0;}
   .lFaqItem h3{font-size:.95rem; color:var(--text); margin:0 0 6px;}
   .lFaqItem p{font-size:.85rem; line-height:1.55; color:var(--text-muted); margin:0;}
@@ -619,33 +628,6 @@
       <button type="button" id="sideMenuCloseBtn" aria-label="Cerrar menú" title="Cerrar menú"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="5" y1="5" x2="19" y2="19"/><line x1="19" y1="5" x2="5" y2="19"/></svg></button>
     </div>
 
-    <div id="sideMenuNav" role="menu">
-      <button type="button" class="more-menu-item" id="menuNewChat" role="menuitem">
-        <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
-        Nueva conversación
-      </button>
-      <button type="button" class="more-menu-item" id="menuBebe" role="menuitem">
-        <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg></span>
-        Perfil del bebé
-      </button>
-      <button type="button" class="more-menu-item" id="menuAgenda" role="menuitem">
-        <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
-        Agenda
-      </button>
-      <button type="button" class="more-menu-item" id="menuSonidos" role="menuitem">
-        <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
-        Sonidos para dormir
-      </button>
-      <a href="https://www.tiktok.com/@baby.mathew.ia" target="_blank" rel="noopener" class="more-menu-item" id="menuTikTok" role="menuitem">
-        <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.6 5.82c-.84-.73-1.38-1.77-1.5-2.93h-3.03v13.44a3.03 3.03 0 1 1-2.14-2.9V10.3a6.1 6.1 0 1 0 5.17 6.03V9.57a8.13 8.13 0 0 0 4.75 1.53V8.07c-1.19 0-2.3-.4-3.25-1.08l0 0z"/></svg></span>
-        Síguenos en TikTok
-      </a>
-      <a href="/terminos.html" target="_blank" rel="noopener" class="more-menu-item" id="menuTerms" role="menuitem">
-        <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg></span>
-        Términos y privacidad
-      </a>
-    </div>
-
     <div class="sideMenuLabel">Sobre Baby Mathew</div>
 
     <div id="sideMenuInfo">
@@ -667,22 +649,23 @@
           <div class="lSection">
             <div class="lWrap">
               <h2>Temas que cubrimos, por etapa</h2>
+              <p class="lLead" style="margin-bottom:4px;">Toca una etapa para preguntarle a Baby Mathew sobre ella.</p>
               <div class="lCards">
-                <div class="lCard">
+                <button type="button" class="lCard" id="temaEmbarazo" data-q="Cuéntame, en términos generales, qué debo saber sobre el embarazo (semanas 1 a 40): síntomas por trimestre, alimentación, ejercicio y señales de alarma.">
                   <div class="lIcon">🤰</div>
                   <h3>Embarazo (semanas 1-40)</h3>
                   <p>Síntomas por trimestre, ejercicio, alimentación, derechos laborales, preparación para la lactancia y señales de alarma.</p>
-                </div>
-                <div class="lCard">
+                </button>
+                <button type="button" class="lCard" id="temaLactante" data-q="Cuéntame, en términos generales, qué debo saber sobre el cuidado de un bebé lactante (0 a 6 meses): lactancia, sueño, cólicos y cuándo consultar con urgencia.">
                   <div class="lIcon">🍼</div>
                   <h3>Lactante (0-6 meses)</h3>
                   <p>Lactancia y fórmula, sueño, cólicos, piel del recién nacido, vacunas y cuándo consultar con urgencia.</p>
-                </div>
-                <div class="lCard">
+                </button>
+                <button type="button" class="lCard" id="temaInfanteMayor" data-q="Cuéntame, en términos generales, qué debo saber sobre el cuidado de un infante mayor (6 a 24 meses): alimentación complementaria, hitos del desarrollo y adaptación al jardín.">
                   <div class="lIcon">🧸</div>
                   <h3>Infante mayor (6-24 meses)</h3>
                   <p>Alimentación complementaria, destete, hitos del desarrollo, adaptación al jardín y salud bucal temprana.</p>
-                </div>
+                </button>
               </div>
             </div>
           </div>
@@ -690,27 +673,34 @@
       </details>
 
       <details class="menuAccordion">
-        <summary>Preguntas frecuentes y contáctenos<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+        <summary>Preguntas frecuentes<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
         <div class="menuAccordionBody">
           <div class="lSection">
             <div class="lWrap">
               <h2>Preguntas frecuentes</h2>
+              <p class="lLead" style="margin-bottom:4px;">Toca una pregunta para que Baby Mathew te la responda en el chat.</p>
               <div class="lFaq">
-                <div class="lFaqItem">
+                <button type="button" class="lFaqItem" id="faqMedico" data-q="¿Baby Mathew reemplaza a mi médico?">
                   <h3>¿Baby Mathew reemplaza a mi médico?</h3>
                   <p>No. Es un asistente informativo que te orienta y te dice cuándo algo requiere atención médica — nunca da diagnósticos ni dosis de medicamentos.</p>
-                </div>
-                <div class="lFaqItem">
+                </button>
+                <button type="button" class="lFaqItem" id="faqCosto" data-q="¿Tiene algún costo usar Baby Mathew IA?">
                   <h3>¿Tiene algún costo?</h3>
                   <p>No, usarlo es gratuito.</p>
-                </div>
-                <div class="lFaqItem">
+                </button>
+                <button type="button" class="lFaqItem" id="faqDatos" data-q="¿Qué pasa con mis datos cuando uso Baby Mathew IA?">
                   <h3>¿Qué pasa con mis datos?</h3>
-                  <p>Se tratan según nuestra <a href="/terminos.html">Política de Tratamiento de Datos</a>, con especial cuidado en la información sensible de salud que decidas compartir.</p>
-                </div>
+                  <p>Se tratan según nuestra Política de Tratamiento de Datos (ver "Términos y privacidad" más abajo), con especial cuidado en la información sensible de salud que decidas compartir.</p>
+                </button>
               </div>
             </div>
           </div>
+        </div>
+      </details>
+
+      <details class="menuAccordion">
+        <summary>Contáctenos<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+        <div class="menuAccordionBody">
           <div class="lSection" id="contactoSection">
             <div class="lWrap">
               <h2>Contáctanos</h2>
@@ -719,6 +709,36 @@
           </div>
         </div>
       </details>
+
+      <a href="/terminos.html" target="_blank" rel="noopener" class="more-menu-item" id="menuTerms" role="menuitem">
+        <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg></span>
+        Términos y privacidad
+      </a>
+    </div>
+
+    <div class="sideMenuLabel" id="sideMenuNavLabel">Opciones</div>
+
+    <div id="sideMenuNav" role="menu">
+      <button type="button" class="more-menu-item" id="menuNewChat" role="menuitem">
+        <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg></span>
+        Nueva conversación
+      </button>
+      <button type="button" class="more-menu-item" id="menuBebe" role="menuitem">
+        <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg></span>
+        Perfil del bebé
+      </button>
+      <button type="button" class="more-menu-item" id="menuAgenda" role="menuitem">
+        <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span>
+        Agenda
+      </button>
+      <button type="button" class="more-menu-item" id="menuSonidos" role="menuitem">
+        <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg></span>
+        Sonidos para dormir
+      </button>
+      <a href="https://www.tiktok.com/@baby.mathew.ia" target="_blank" rel="noopener" class="more-menu-item" id="menuTikTok" role="menuitem">
+        <span class="more-menu-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.6 5.82c-.84-.73-1.38-1.77-1.5-2.93h-3.03v13.44a3.03 3.03 0 1 1-2.14-2.9V10.3a6.1 6.1 0 1 0 5.17 6.03V9.57a8.13 8.13 0 0 0 4.75 1.53V8.07c-1.19 0-2.3-.4-3.25-1.08l0 0z"/></svg></span>
+        Síguenos en TikTok
+      </a>
     </div>
 
     <div id="sideMenuFooter">
@@ -1595,6 +1615,19 @@
     if (!btn || busy) return;
     ask(btn.getAttribute("data-q"));
   });
+
+  // Tarjetas de "Temas por etapa" y preguntas del FAQ, dentro del menú:
+  // al tocarlas, cierran el menú (si estaba abierto, en móvil) y mandan la
+  // pregunta al chat — igual que los chips de ejemplo de la pantalla inicial.
+  var sideMenuInfoEl = document.getElementById("sideMenuInfo");
+  if (sideMenuInfoEl) {
+    sideMenuInfoEl.addEventListener("click", function(ev){
+      var btn = ev.target.closest("[data-q]");
+      if (!btn || busy) return;
+      closeMoreMenu();
+      ask(btn.getAttribute("data-q"));
+    });
+  }
 
   async function startNewConversation(){
     if (busy) return;
