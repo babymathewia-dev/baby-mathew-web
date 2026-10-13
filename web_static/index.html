@@ -3417,7 +3417,21 @@
         var histRes = await fetch("/api/history");
         if (histRes.ok) {
           var histData = await histRes.json();
-          renderTurns(histData.turns || []);
+          // Esta llamada es async y puede tardar (más aún si el backend
+          // viene de estar dormido). Si en ese tiempo la persona ya
+          // escribió y envió su primera pregunta, ask() ya hizo
+          // turns.push() con ese mensaje antes de que esta respuesta
+          // llegara. Pintar el historial viejo encima en ese caso
+          // pisaba turns con el array antiguo (sin el mensaje recién
+          // enviado) y lo dejaba fuera del contexto que se le manda al
+          // bot en el siguiente turno, aunque su burbuja siguiera
+          // visible en pantalla -- así se "perdía" la primera pregunta.
+          // Si ya hay algo en turns, esta sesión ya tiene el estado más
+          // reciente y no hay nada que el historial guardado pueda
+          // aportarle.
+          if (!turns.length) {
+            renderTurns(histData.turns || []);
+          }
         }
       } catch (e) { /* si falla, arranca sin historial previo */ }
     } else {
