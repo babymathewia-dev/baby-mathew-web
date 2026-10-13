@@ -37,7 +37,30 @@ window.dataLayer = window.dataLayer || [];
     // 1) Pregunta enviada, respuesta recibida y errores: se mide en la llamada al bot
     var fetchOriginal = window.fetch;
     window.fetch = function (url, opts) {
-      var esChat = String(url && url.url || url).indexOf('/api/chat') !== -1;
+      var ruta = String(url && url.url || url);
+      var metodo = String((opts && opts.method) || (url && url.method) || 'GET').toUpperCase();
+
+      // [ANALÍTICA] Registro de crecimiento: solo QUÉ campos se llenaron (si/no).
+      // Nunca se envían valores de peso, talla, perímetro ni fechas (dato de
+      // salud de un menor — Ley 1581/2012, arts. 5 y 7).
+      if (metodo === 'POST' && /\/api\/bebe\/crecimiento\/?$/.test(ruta.split('?')[0])) {
+        var campos = {};
+        try { campos = JSON.parse((opts && opts.body) || '{}') || {}; } catch (e) {}
+        return fetchOriginal.apply(this, arguments).then(function (resp) {
+          resp.clone().json().then(function (data) {
+            if (resp.ok && data && data.ok) {
+              gtag('event', 'crecimiento_registrado', {
+                con_peso: campos.peso_g ? 'si' : 'no',
+                con_talla: campos.talla_mm ? 'si' : 'no',
+                con_pc: campos.perimetro_cefalico_mm ? 'si' : 'no'
+              });
+            }
+          }).catch(function () {});
+          return resp;
+        });
+      }
+
+      var esChat = ruta.indexOf('/api/chat') !== -1;
       if (!esChat) return fetchOriginal.apply(this, arguments);
 
       nPregunta++;
@@ -64,6 +87,7 @@ window.dataLayer = window.dataLayer || [];
         // completo — no cuando llegan los primeros bytes.
         (async function () {
           var tema = null;
+          var conPerfil = null;    // [ANALÍTICA] true/false según el evento final del backend
           var tipoError = null;
           var terminado = false;   // llegó el evento final ("done" o "error")
           function procesarEvento(bloque) {
@@ -75,7 +99,11 @@ window.dataLayer = window.dataLayer || [];
               var evt;
               try { evt = JSON.parse(l.slice(5).trim()); } catch (e) { continue; }
               if (evt && evt.error) { tipoError = String(evt.error); terminado = true; }
-              if (evt && evt.done) { tema = evt.tema || null; terminado = true; }
+              if (evt && evt.done) {
+                tema = evt.tema || null;
+                if (typeof evt.con_perfil === 'boolean') conPerfil = evt.con_perfil;
+                terminado = true;
+              }
             }
           }
           try {
@@ -86,7 +114,10 @@ window.dataLayer = window.dataLayer || [];
               // límite de mensajes 429) o un backend aún sin streaming.
               var data = await resp.clone().json();
               if (data && data.error) tipoError = String(data.error);
-              else tema = (data && data.tema) || null;
+              else {
+                tema = (data && data.tema) || null;
+                if (data && typeof data.con_perfil === 'boolean') conPerfil = data.con_perfil;
+              }
               terminado = true;
             } else {
               var reader = resp.clone().body.getReader();
@@ -109,7 +140,10 @@ window.dataLayer = window.dataLayer || [];
           if (tipoError) {
             gtag('event', 'respuesta_error', { latencia_ms: ms, codigo_http: resp.status, tipo_error: tipoError });
           } else {
-            gtag('event', 'respuesta_recibida', { latencia_ms: ms, numero_pregunta: n, tema: tema || 'Sin clasificar' });
+            var perfil = conPerfil === null ? 'desconocido' : (conPerfil ? 'si' : 'no');
+            gtag('event', 'respuesta_recibida', { latencia_ms: ms, numero_pregunta: n, tema: tema || 'Sin clasificar', con_perfil: perfil });
+            // Propiedad de usuario para comparar regreso de usuarios con y sin perfil del bebé.
+            if (conPerfil !== null) gtag('set', 'user_properties', { tiene_perfil: conPerfil ? 'si' : 'no' });
             gtag('event', 'tema_consultado', { tema: tema || 'Sin clasificar' });
           }
         })();
@@ -126,13 +160,42 @@ window.dataLayer = window.dataLayer || [];
     document.addEventListener('click', function (ev) {
       var t = ev.target;
       if (!t || !t.closest) return;
-      if (t.closest('#newChatBtn')) {
+      // [ANALÍTICA] #newChatBtn ahora abre el menú "Más opciones"; la nueva
+      // conversación real es el ítem #menuNewChat (antes se contaba cada
+      // apertura del menú como nueva conversación y se reiniciaba el conteo).
+      if (t.closest('#menuNewChat')) {
         gtag('event', 'nueva_conversacion', { preguntas_previas: nPregunta });
         nPregunta = 0;
+      } else if (t.closest('#menuBebe')) {
+        gtag('event', 'perfil_bebe_abierto');
+      } else if (t.closest('#menuAgenda')) {
+        gtag('event', 'agenda_abierta');
+      } else if (t.closest('#menuSonidos')) {
+        gtag('event', 'sonidos_abiertos');
+      } else if (t.closest('#menuTikTok')) {
+        gtag('event', 'tiktok_click');
       } else if (t.closest('#attachBtn')) {
         gtag('event', 'adjunto_click');
       } else if (t.closest('.chip')) {
         gtag('event', 'pregunta_ejemplo_click');
       }
     }, true);
+
+    // 3) [ANALÍTICA] Gráfica de crecimiento vista: se detecta cuando la página
+    // dibuja #crecimientoGrafica (un evento por apertura; los redibujos al
+    // guardar o borrar una medición dentro de 30 s no se cuentan de nuevo).
+    var ultimaGrafica = 0, nodoGrafica = null;
+    function revisarGrafica() {
+      var el = document.getElementById('crecimientoGrafica');
+      if (el && el !== nodoGrafica) {          // solo cuando se dibuja de nuevo
+        nodoGrafica = el;
+        if (Date.now() - ultimaGrafica > 30000) {
+          ultimaGrafica = Date.now();
+          gtag('event', 'crecimiento_grafica_vista');
+        }
+      }
+    }
+    try {
+      new MutationObserver(revisarGrafica).observe(document.documentElement, { childList: true, subtree: true });
+    } catch (e) {}
   })();
