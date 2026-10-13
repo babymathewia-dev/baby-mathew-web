@@ -100,13 +100,17 @@
   }
   #sideMenuBackdrop.open{opacity:1; pointer-events:auto;}
   @media (min-width:860px){
-    /* El panel queda siempre visible, fijo junto al chat — como en el mockup
-       aprobado. El botón ☰ (solo necesario para abrir/cerrar en móvil) se
-       oculta más abajo en la hoja de estilos, después de fijar su tamaño. */
+    /* En escritorio el panel va "empotrado" junto al chat (no flota encima)
+       y por defecto se ve abierto, como en el mockup aprobado — pero sigue
+       siendo la MISMA clase .open la que decide si se ve o no, así que la
+       "X" (o volver a tocar ☰) también puede cerrarlo aquí: cuando no tiene
+       .open, su ancho colapsa a 0 y el chat ocupa todo el espacio. */
     #sideMenu{
-      position:static; width:300px; min-width:300px; max-width:none;
-      transform:none; box-shadow:none;
+      position:static; width:0; min-width:0; max-width:none;
+      transform:none; box-shadow:none; border-right:none;
+      overflow-x:hidden; overflow-y:hidden; transition:width .18s ease;
     }
+    #sideMenu.open{width:300px; min-width:300px; border-right:1px solid var(--border); overflow-y:auto;}
     #sideMenuBackdrop{display:none;}
   }
   #sideMenuHeader{
@@ -153,7 +157,7 @@
   #sideMenu .lSection + .lSection{border-top:none;}
   #sideMenu .lWrap{max-width:none; padding:0;}
   #sideMenu .lSection h2{display:none;}
-  #sideMenu .lLead{text-align:left; max-width:none; font-size:.82rem; margin:0;}
+  #sideMenu .lLead{text-align:justify; max-width:none; font-size:.82rem; margin:0;}
   #sideMenu .lCards{grid-template-columns:1fr; gap:8px; margin-top:6px;}
   #sideMenu .lCard{padding:10px 12px; border-radius:12px;}
   #sideMenu .lCard .lIcon{font-size:1.3rem;}
@@ -475,11 +479,6 @@
   /* Adjuntar y "más opciones" quedan a la misma altura que "Enviar"
      (antes eran más bajos y se veían desalineados contra el textarea). */
   #attachBtn, #newChatBtn{width:44px; height:44px; border-radius:14px;}
-  @media (min-width:860px){
-    /* El menú ya queda siempre visible como panel fijo (ver arriba), así que
-       el botón ☰ — necesario solo para abrir/cerrarlo en móvil — sobra aquí. */
-    #newChatBtn{display:none;}
-  }
 
   /* Mensaje de emergencia del protocolo de seguridad: se resalta como
      aviso (mismo tratamiento de color que los errores) en vez de verse
@@ -533,7 +532,7 @@
   .lCard{background:var(--bg); border:1px solid var(--border); border-radius:16px; padding:20px; display:flex; flex-direction:column; gap:8px;}
   .lCard .lIcon{font-size:1.6rem;}
   .lCard h3{font-family:"Baloo 2","Source Sans 3",sans-serif; font-size:1.02rem; color:var(--text); margin:0;}
-  .lCard p{font-size:.85rem; line-height:1.55; color:var(--text-muted); margin:0;}
+  .lCard p{font-size:.85rem; line-height:1.55; color:var(--text-muted); margin:0; text-align:justify;}
   /* Tarjetas de "Temas por etapa" y preguntas del FAQ: ahora son botones que
      envían la pregunta al chat (ver JS), así que se resetea su apariencia
      por-defecto de <button> sin tocar el resto del estilo visual. */
@@ -544,7 +543,7 @@
   .lFaqItem{border-bottom:1px solid var(--border); padding-bottom:16px; background:none; border-left:none; border-right:none; border-top:none;}
   .lFaqItem:last-child{border-bottom:none; padding-bottom:0;}
   .lFaqItem h3{font-size:.95rem; color:var(--text); margin:0 0 6px;}
-  .lFaqItem p{font-size:.85rem; line-height:1.55; color:var(--text-muted); margin:0;}
+  .lFaqItem p{font-size:.85rem; line-height:1.55; color:var(--text-muted); margin:0; text-align:justify;}
   .lContactForm{max-width:460px; margin:26px auto 0; display:flex; flex-direction:column; gap:14px;}
   .lContactForm .fld{display:flex; flex-direction:column; gap:4px;}
   .lContactForm label{font-size:.82rem; font-weight:700; color:var(--text);}
@@ -1624,7 +1623,12 @@
     sideMenuInfoEl.addEventListener("click", function(ev){
       var btn = ev.target.closest("[data-q]");
       if (!btn || busy) return;
-      closeMoreMenu();
+      // En móvil el panel flota encima del chat, así que se cierra para dejar
+      // ver la respuesta; en escritorio va empotrado junto al chat (ya
+      // visible), así que se deja abierto por si quiere tocar otra tarjeta.
+      try {
+        if (!(window.matchMedia && window.matchMedia("(min-width: 860px)").matches)) closeMoreMenu();
+      } catch (e) { closeMoreMenu(); }
       ask(btn.getAttribute("data-q"));
     });
   }
@@ -1640,9 +1644,11 @@
   }
 
   // El menú (antes un pequeño desplegable sobre el botón "+", ahora el panel
-  // #sideMenu) solo necesita abrirse/cerrarse en móvil: en escritorio queda
-  // siempre visible por CSS (ver @media min-width:860px) y #newChatBtn se
-  // oculta, así que estas funciones no tienen nada que hacer ahí.
+  // #sideMenu) se abre/cierra con la misma clase "open" tanto en móvil
+  // (donde flota encima del chat) como en escritorio (donde empuja el
+  // layout, empotrado junto al chat — ver @media min-width:860px en el
+  // CSS). Por defecto arranca abierto en escritorio y cerrado en móvil,
+  // pero en ambos casos la "X" / el ☰ lo pueden cerrar y volver a abrir.
   function closeMoreMenu(){
     moreMenu.classList.remove("open");
     if (sideMenuBackdrop) sideMenuBackdrop.classList.remove("open");
@@ -1655,6 +1661,11 @@
     newChatBtn.classList.add("open");
     newChatBtn.setAttribute("aria-expanded", "true");
   }
+  try {
+    if (window.matchMedia && window.matchMedia("(min-width: 860px)").matches) {
+      openMoreMenu();
+    }
+  } catch (e) { /* no-op */ }
   newChatBtn.addEventListener("click", function(ev){
     ev.stopPropagation();
     if (moreMenu.classList.contains("open")) { closeMoreMenu(); } else { openMoreMenu(); }
@@ -1669,6 +1680,12 @@
     closeMoreMenu();
   });
   document.addEventListener("click", function(ev){
+    // En escritorio el panel va empotrado junto al chat (no flota encima),
+    // así que un clic en el chat no debe cerrarlo — solo la "X" o el ☰ lo
+    // cierran ahí. En móvil sí se cierra al tocar fuera, como un overlay normal.
+    try {
+      if (window.matchMedia && window.matchMedia("(min-width: 860px)").matches) return;
+    } catch (e) { /* no-op */ }
     if (!moreMenu.classList.contains("open")) return;
     if (moreMenu.contains(ev.target) || newChatBtn.contains(ev.target)) return;
     closeMoreMenu();
