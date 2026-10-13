@@ -161,8 +161,8 @@
   #sideMenu .lCards{grid-template-columns:1fr; gap:8px; margin-top:6px;}
   #sideMenu .lCard{padding:10px 12px; border-radius:12px;}
   #sideMenu .lCard .lIcon{font-size:1.3rem;}
-  #sideMenu .lFaq{max-width:none; margin-top:4px; gap:12px;}
-  #sideMenu .lFaqItem{padding-bottom:12px;}
+  #sideMenu .lFaq{max-width:none; margin-top:4px; gap:14px;}
+  #sideMenu .lFaqItem{padding:12px 14px; border-radius:12px; gap:4px;}
   #sideMenu .lContactForm{max-width:none; margin-top:4px; gap:10px;}
   #sideMenu .lContactForm p{text-align:left;}
   header{
@@ -538,11 +538,14 @@
      por-defecto de <button> sin tocar el resto del estilo visual. */
   button.lCard, button.lFaqItem{font:inherit; text-align:left; width:100%; margin:0;}
   button.lCard:hover, button.lCard:focus-visible{border-color:var(--primary);}
+  button.lFaqItem:hover, button.lFaqItem:focus-visible{border-color:var(--primary);}
   button.lFaqItem:hover h3, button.lFaqItem:focus-visible h3{color:var(--primary-dark);}
-  .lFaq{max-width:680px; margin:26px auto 0; display:flex; flex-direction:column; gap:16px;}
-  .lFaqItem{border-bottom:1px solid var(--border); padding-bottom:16px; background:none; border-left:none; border-right:none; border-top:none;}
-  .lFaqItem:last-child{border-bottom:none; padding-bottom:0;}
-  .lFaqItem h3{font-size:.95rem; color:var(--text); margin:0 0 6px;}
+  /* Preguntas frecuentes: mismo lenguaje visual que las tarjetas de
+     "Temas por etapa" (recuadro delimitado en vez de línea divisoria),
+     con más aire entre una pregunta y otra. */
+  .lFaq{max-width:680px; margin:26px auto 0; display:flex; flex-direction:column; gap:20px;}
+  .lFaqItem{background:var(--bg); border:1px solid var(--border); border-radius:16px; padding:18px 20px; display:flex; flex-direction:column; gap:8px;}
+  .lFaqItem h3{font-size:.95rem; color:var(--text); margin:0;}
   .lFaqItem p{font-size:.85rem; line-height:1.55; color:var(--text-muted); margin:0; text-align:justify;}
   .lContactForm{max-width:460px; margin:26px auto 0; display:flex; flex-direction:column; gap:14px;}
   .lContactForm .fld{display:flex; flex-direction:column; gap:4px;}
@@ -683,9 +686,9 @@
                   <h3>¿Baby Mathew reemplaza a mi médico?</h3>
                   <p>No. Es un asistente informativo que te orienta y te dice cuándo algo requiere atención médica — nunca da diagnósticos ni dosis de medicamentos.</p>
                 </button>
-                <button type="button" class="lFaqItem" id="faqCosto" data-q="¿Tiene algún costo usar Baby Mathew IA?">
-                  <h3>¿Tiene algún costo?</h3>
-                  <p>No, usarlo es gratuito.</p>
+                <button type="button" class="lFaqItem" id="faqFuentes" data-q="¿En qué fuentes o guías se basan las respuestas de Baby Mathew?">
+                  <h3>¿En qué se basan sus respuestas?</h3>
+                  <p>En guías clínicas reconocidas como la OMS, la Academia Americana de Pediatría y las guías del ICBF para Colombia — siempre como orientación, nunca como diagnóstico.</p>
                 </button>
                 <button type="button" class="lFaqItem" id="faqDatos" data-q="¿Qué pasa con mis datos cuando uso Baby Mathew IA?">
                   <h3>¿Qué pasa con mis datos?</h3>
