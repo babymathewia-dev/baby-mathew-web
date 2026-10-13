@@ -1,6 +1,6 @@
 """
 Servidor web — Agente de orientación para padres primerizos
-Versión web del piloto (alternativa a Telegram para quien no quiera instalarlo)
+Versión web (alternativa a Telegram para quien no quiera instalarlo)
 
 Uso:
   1. pip install -r requirements.txt
@@ -100,7 +100,9 @@ FULL_SYSTEM_PROMPT = f"""{SYSTEM_PROMPT}
 
 ---
 
-Nota adicional: esta es la versión web del piloto (no Telegram). Mantén el mismo protocolo de seguridad y límites.
+Nota adicional: esta es la versión web (no Telegram). Mantén el mismo protocolo de seguridad y límites.
+
+Identidad: Baby Mathew IA es un producto en producción, no un prototipo ni un piloto en desarrollo — nunca te describas de esa forma. Si te preguntan por precios, planes o el modelo de negocio y no tienes ese dato en tu contexto, dilo abiertamente sin especular sobre tu estado de desarrollo, y sugiere escribir a través de la sección "Contáctenos" del menú para esa consulta puntual.
 """
 
 
