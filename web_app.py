@@ -34,6 +34,7 @@ import anthropic
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 from authlib.integrations.flask_client import OAuth
+from werkzeug.security import check_password_hash
 
 # ---------------------------------------------------------------------------
 # Configuración (misma lógica que bot.py)
@@ -369,6 +370,16 @@ RESEND_FROM = os.environ.get("RESEND_FROM", "Baby Mathew IA <recordatorios@babym
 # Bandeja donde caen los mensajes del formulario de "Contáctenos".
 CONTACTO_DESTINO = os.environ.get("CONTACTO_EMAIL", "Baby.mathew.ia@gmail.com")
 TAREAS_SECRET_TOKEN = os.environ.get("TAREAS_SECRET_TOKEN")
+# Login de pruebas (usuario/contraseña), independiente de Google OAuth: le
+# da a Hernán una cuenta estable con su propio perfil de bebé para probar
+# la experiencia de "gestación" sin tocar el perfil real de su cuenta
+# personal (donde su bebé ya nació). Nunca va en el código -- ambas
+# variables se configuran directo en Render. TEST_LOGIN_PASSWORD_HASH se
+# genera así (nunca se guarda la contraseña en texto plano):
+#   python -c "from werkzeug.security import generate_password_hash as g; print(g('la-contraseña'))"
+TEST_LOGIN_USER = os.environ.get("TEST_LOGIN_USER")
+TEST_LOGIN_PASSWORD_HASH = os.environ.get("TEST_LOGIN_PASSWORD_HASH")
+TEST_LOGIN_ENABLED = bool(TEST_LOGIN_USER and TEST_LOGIN_PASSWORD_HASH)
 if not RESEND_API_KEY:
     logger.warning(
         "Falta la variable de entorno RESEND_API_KEY: los recordatorios por "
@@ -663,6 +674,98 @@ def auth_callback():
     session["user_id"] = user_id
     session["name"] = name
     session["picture"] = picture
+    session["email"] = email
+    return redirect("/")
+
+
+# Login de pruebas con usuario/contraseña propios (no sale en ningún menú ni
+# enlace visible -- solo quien conoce esta URL la encuentra). No reemplaza a
+# Google: crea/reutiliza su propia fila en `users`, con su propio perfil de
+# bebé independiente, para poder probar la experiencia de "gestación" sin
+# tocar el perfil real de otra cuenta. Si las variables de entorno no están
+# configuradas en Render, la ruta queda inactiva (404) por defecto.
+_TEST_LOGIN_FORM = """<!doctype html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Acceso de pruebas</title>
+<style>
+body{font-family:system-ui,sans-serif;background:#F3FAF9;display:flex;
+  align-items:center;justify-content:center;min-height:100vh;margin:0}
+form{background:#fff;padding:28px 26px;border-radius:16px;box-shadow:0 4px 20px rgba(20,50,47,.12);
+  width:100%;max-width:320px;box-sizing:border-box}
+h1{font-size:1.05rem;margin:0 0 16px;color:#173330}
+label{display:block;font-size:.82rem;font-weight:700;color:#173330;margin:12px 0 4px}
+input{width:100%;box-sizing:border-box;padding:9px 11px;border-radius:9px;border:1px solid #D8ECE9;font-size:15px}
+button{margin-top:18px;width:100%;padding:10px;border:none;border-radius:9px;background:#3E8E8A;
+  color:#fff;font-weight:700;font-size:15px;cursor:pointer}
+p.err{color:#B3261E;font-size:.82rem;margin:10px 0 0}
+</style></head><body>
+<form method="post" action="/auth/login-pruebas">
+<h1>Acceso de pruebas -- Baby Mathew IA</h1>
+<label for="u">Usuario</label>
+<input id="u" name="usuario" autocomplete="username" required>
+<label for="p">Contraseña</label>
+<input id="p" name="contrasena" type="password" autocomplete="current-password" required>
+__ERROR__
+<button type="submit">Entrar</button>
+</form></body></html>"""
+
+
+def _render_test_login_form(error=""):
+    return _TEST_LOGIN_FORM.replace("__ERROR__", error)
+
+
+@app.route("/auth/login-pruebas", methods=["GET"])
+def auth_login_pruebas_form():
+    if not TEST_LOGIN_ENABLED:
+        return "Not found", 404
+    return _render_test_login_form()
+
+
+@app.route("/auth/login-pruebas", methods=["POST"])
+@limiter.limit("5 per hour")
+def auth_login_pruebas():
+    if not TEST_LOGIN_ENABLED:
+        return "Not found", 404
+
+    usuario = (request.form.get("usuario") or "").strip()
+    contrasena = request.form.get("contrasena") or ""
+
+    # Comparación del usuario en tiempo constante (evita medir por timing si
+    # el usuario escrito es correcto); la de la contraseña ya la hace segura
+    # check_password_hash internamente.
+    usuario_ok = secrets.compare_digest(usuario, TEST_LOGIN_USER)
+    password_ok = check_password_hash(TEST_LOGIN_PASSWORD_HASH, contrasena)
+    if not (usuario_ok and password_ok):
+        logger.warning("Intento fallido de login de pruebas (usuario: %r)", usuario)
+        return _render_test_login_form(
+            '<p class="err">Usuario o contraseña incorrectos.</p>'
+        ), 401
+
+    # Cuenta de pruebas estable: mismo google_sub siempre, así conserva su
+    # propio perfil de bebé, agenda, etc. entre sesiones -- igual que
+    # cualquier cuenta real, pero sin pasar por Google.
+    google_sub = "test-login:" + TEST_LOGIN_USER
+    email = "pruebas@babymathewia.local"
+    name = "Cuenta de pruebas"
+
+    conn = get_db()
+    row = conn.execute("SELECT id FROM users WHERE google_sub = ?", (google_sub,)).fetchone()
+    if row:
+        user_id = row["id"]
+    else:
+        cur = conn.execute(
+            "INSERT INTO users (google_sub, email, name, picture) VALUES (?, ?, ?, ?)",
+            (google_sub, email, name, ""),
+        )
+        user_id = cur.lastrowid
+    conn.commit()
+    conn.close()
+
+    session.permanent = True
+    session["user_id"] = user_id
+    session["name"] = name
+    session["picture"] = ""
     session["email"] = email
     return redirect("/")
 
