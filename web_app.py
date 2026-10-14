@@ -301,6 +301,25 @@ app.config.update(
     PERMANENT_SESSION_LIFETIME=60 * 60 * 24 * 30,
 )
 
+# Redirección 301 permanente del dominio anterior (babymathewia.com) al nuevo
+# dominio principal (bebeteguia.com). Ambos siguen registrados y apuntando a
+# este mismo servicio en Render -- esto solo decide cuál es el "canónico" de
+# cara al usuario y a buscadores, sin romper enlaces, marcadores ni accesos
+# ya guardados con el dominio anterior. Si el dominio principal cambia de
+# nuevo en el futuro, basta con actualizar _DOMINIO_PRINCIPAL y agregar el
+# anterior a _DOMINIOS_ANTERIORES.
+_DOMINIO_PRINCIPAL = "bebeteguia.com"
+_DOMINIOS_ANTERIORES = {"babymathewia.com", "www.babymathewia.com"}
+
+
+@app.before_request
+def _redirigir_dominio_anterior():
+    host_actual = request.host.split(":")[0].lower()
+    if host_actual in _DOMINIOS_ANTERIORES:
+        destino = request.url.replace(request.host, _DOMINIO_PRINCIPAL, 1)
+        return redirect(destino, code=301)
+
+
 # Límite de solicitudes por IP a /api/chat: cada llamada tiene costo real
 # (tokens de la API de Anthropic + búsqueda web). Dos niveles: uno generoso
 # para no afectar el uso normal (incluso de varias personas compartiendo la
