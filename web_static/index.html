@@ -165,6 +165,38 @@
   #sideMenu .lFaqItem{padding:12px 14px; border-radius:12px; gap:4px;}
   #sideMenu .lContactForm{max-width:none; margin-top:4px; gap:10px;}
   #sideMenu .lContactForm p{text-align:left;}
+
+  /* Guías premium (Hotmart) dentro del menú lateral. */
+  .gCards{display:flex; flex-direction:column; gap:8px; margin-top:6px;}
+  .gCard{
+    display:flex; gap:10px; align-items:stretch; background:var(--surface);
+    border:1px solid var(--border); border-radius:14px; padding:10px;
+    text-decoration:none; color:inherit;
+  }
+  .gCard:hover, .gCard:focus-visible{border-color:var(--primary);}
+  .gCardThumb{
+    position:relative; width:56px; height:72px; flex:0 0 auto; border-radius:8px;
+    overflow:hidden; display:flex; align-items:center; justify-content:center;
+  }
+  .gCardThumb svg{opacity:.85;}
+  .gCardLock{
+    position:absolute; top:4px; right:4px; width:18px; height:18px; border-radius:50%;
+    background:rgba(23,51,48,.55); display:flex; align-items:center; justify-content:center;
+  }
+  .gCardBody{flex:1; min-width:0; display:flex; flex-direction:column; gap:2px;}
+  .gCardBody h3{font-family:"Baloo 2","Source Sans 3",sans-serif; font-size:.86rem; font-weight:700; color:var(--text); margin:0; line-height:1.25;}
+  .gCardBody p{font-size:.78rem; color:var(--text-muted); margin:0; line-height:1.35;}
+  .gCardMeta{margin-top:4px; display:flex; align-items:center; justify-content:space-between; gap:6px;}
+  .gCardPrice{font-weight:700; font-size:.82rem; color:var(--text);}
+  .gCardCta{font-size:.72rem; font-weight:700; color:#FFFFFF; padding:4px 10px; border-radius:999px; white-space:nowrap;}
+  .gCardNote{margin:6px 2px 0; font-size:.72rem; color:var(--text-muted); line-height:1.45;}
+  .gCard--embarazo .gCardThumb{background:linear-gradient(165deg,#2B6A67 0%,#3E8E8A 55%,#5FACA8 100%);}
+  .gCard--embarazo .gCardCta{background:#3E8E8A;}
+  .gCard--sueno .gCardThumb{background:linear-gradient(165deg,#2B3F6A 0%,#3E5E8E 55%,#6C8FB8 100%);}
+  .gCard--sueno .gCardCta{background:#3E5E8E;}
+  .gCard--lactancia .gCardThumb{background:linear-gradient(165deg,#7A2142 0%,#A83A5C 55%,#C96E86 100%);}
+  .gCard--lactancia .gCardCta{background:#A83A5C;}
+
   header{
     flex:0 0 auto; padding:14px 18px 12px; background:var(--surface);
     border-bottom:1px solid var(--border); display:flex; align-items:center; gap:12px;
@@ -669,6 +701,63 @@
                   <p>Alimentación complementaria, destete, hitos del desarrollo, adaptación al jardín y salud bucal temprana.</p>
                 </button>
               </div>
+            </div>
+          </div>
+        </div>
+      </details>
+
+      <details class="menuAccordion">
+        <summary>Guías para ti<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+        <div class="menuAccordionBody">
+          <div class="lSection">
+            <div class="lWrap">
+              <h2>Guías para ti</h2>
+              <p class="lLead" style="margin-bottom:4px;">Guías descargables en PDF, hechas por Baby Mathew IA. Un pago único, tuyas para siempre.</p>
+              <div class="gCards">
+                <a class="gCard gCard--embarazo" id="guiaEmbarazo" href="https://go.hotmart.com/O108044399T" target="_blank" rel="noopener">
+                  <div class="gCardThumb">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4.4 3.6-7 8-7s8 2.6 8 7"/></svg>
+                    <span class="gCardLock" aria-hidden="true"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+                  </div>
+                  <div class="gCardBody">
+                    <h3>Cómo tener un embarazo saludable</h3>
+                    <p>Trimestre a trimestre: qué esperar, qué priorizar y señales de alarma.</p>
+                    <div class="gCardMeta">
+                      <span class="gCardPrice">$9.900 COP</span>
+                      <span class="gCardCta">Ver guía</span>
+                    </div>
+                  </div>
+                </a>
+                <a class="gCard gCard--sueno" id="guiaSueno" href="https://go.hotmart.com/U108044585H" target="_blank" rel="noopener">
+                  <div class="gCardThumb">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2"><path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/></svg>
+                    <span class="gCardLock" aria-hidden="true"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+                  </div>
+                  <div class="gCardBody">
+                    <h3>El sueño de tu bebé: la rutina, tu mejor opción</h3>
+                    <p>Evolución del sueño mes a mes durante el primer año.</p>
+                    <div class="gCardMeta">
+                      <span class="gCardPrice">$9.900 COP</span>
+                      <span class="gCardCta">Ver guía</span>
+                    </div>
+                  </div>
+                </a>
+                <a class="gCard gCard--lactancia" id="guiaLactancia" href="https://go.hotmart.com/X108045459I" target="_blank" rel="noopener">
+                  <div class="gCardThumb">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2"><path d="M12 21s-7-4.5-9.5-9A5.5 5.5 0 0 1 12 6a5.5 5.5 0 0 1 9.5 6c-2.5 4.5-9.5 9-9.5 9z"/></svg>
+                    <span class="gCardLock" aria-hidden="true"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
+                  </div>
+                  <div class="gCardBody">
+                    <h3>Lactancia sin angustia: tus primeros 6 meses</h3>
+                    <p>Agarre, producción, grietas y vuelta al trabajo sin culpa.</p>
+                    <div class="gCardMeta">
+                      <span class="gCardPrice">$9.900 COP</span>
+                      <span class="gCardCta">Ver guía</span>
+                    </div>
+                  </div>
+                </a>
+              </div>
+              <p class="gCardNote">🔒 Al tocar una guía se abre el pago seguro de Hotmart en una pestaña nueva. El PDF llega a tu correo apenas confirmes el pago.</p>
             </div>
           </div>
         </div>
@@ -1681,6 +1770,10 @@
   });
   document.getElementById("menuTikTok").addEventListener("click", function(){
     closeMoreMenu();
+  });
+  ["guiaEmbarazo", "guiaSueno", "guiaLactancia"].forEach(function(id){
+    var el = document.getElementById(id);
+    if (el) el.addEventListener("click", function(){ closeMoreMenu(); });
   });
   document.addEventListener("click", function(ev){
     // En escritorio el panel va empotrado junto al chat (no flota encima),
