@@ -1771,8 +1771,9 @@ def _en_ventana_30min_antes(hora_str, ahora, ventana_minutos):
 
 
 def _enviar_recordatorios_citas(conn):
-    manana = (date.today() + timedelta(days=1)).isoformat()
-    hoy_str = date.today().isoformat()
+    hoy_bogota = datetime.now(BOGOTA_TZ).date()
+    manana = (hoy_bogota + timedelta(days=1)).isoformat()
+    hoy_str = hoy_bogota.isoformat()
     citas = conn.execute(
         """SELECT * FROM citas WHERE estado = 'pendiente' AND avisarme = 1 AND fecha = ?""",
         (manana,),
