@@ -174,6 +174,17 @@ window.dataLayer = window.dataLayer || [];
         gtag('event', 'sonidos_abiertos');
       } else if (t.closest('#menuTikTok')) {
         gtag('event', 'tiktok_click');
+      } else if (t.closest('.gCard, [id^="guia"]')) {
+        // [ANALÍTICA] Clic en una guía de pago (Hotmart). Se envía el nombre
+        // corto de la guía, sacado del id (guiaEmbarazo -> embarazo), y el
+        // título visible. Ningún dato del usuario.
+        var card = t.closest('.gCard, [id^="guia"]');
+        var slug = (card.id || '').replace(/^guia/, '').toLowerCase() || 'desconocida';
+        var h3 = card.querySelector('h3');
+        gtag('event', 'guia_click', {
+          guia: slug,
+          guia_titulo: h3 ? h3.textContent.trim().slice(0, 100) : slug
+        });
       } else if (t.closest('#attachBtn')) {
         gtag('event', 'adjunto_click');
       } else if (t.closest('.chip')) {
