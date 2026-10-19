@@ -464,6 +464,11 @@
   .crecimientoLeyenda span{display:inline-flex; align-items:center; gap:4px;}
   .crecimientoLeyenda i{width:10px; height:2px; display:inline-block;}
   .crecimientoFueraRango{background:var(--danger-bg); border:1px solid var(--danger-border); color:var(--danger-text); border-radius:10px; padding:8px 10px; font-size:.76rem; margin:0 0 10px;}
+  /* CTA de "Registrar medición", 2026-10-19 — va primero en el plegable
+     (antes de las gráficas), para que no dependa de hacer scroll más allá
+     de 2 gráficas vacías para encontrarlo. */
+  .crecimientoCTA{background:var(--surface-alt); border-radius:14px; padding:14px; margin-bottom:14px;}
+  .crecimientoCTA p{margin:0 0 10px; font-size:.84rem; color:var(--text);}
   .crecimientoRow{background:var(--bg); border:1px solid var(--border); border-radius:12px; padding:10px 12px; display:flex; align-items:center; gap:10px; margin-bottom:8px;}
   .crecimientoRow .datos{flex:1; min-width:0;}
   .crecimientoRow .fecha{margin:0 0 2px; font-size:.82rem; font-weight:700; color:var(--text);}
@@ -2348,17 +2353,21 @@
   // plegado, para no esconder un aviso de salud detrás de un clic.
   // Botón+cuerpo plegable genérico y visible (borde y fondo verdes), que
   // reutilizan tanto "Crecimiento" como "Historial de registros".
-  function crearSeccionPlegable(titulo){
+  // abiertoPorDefecto: "Crecimiento" arranca abierta (2026-10-19 — antes
+  // arrancaba plegada y nadie veía el botón "Registrar medición", que
+  // además quedaba debajo de las gráficas). "Historial de registros" sigue
+  // plegada por defecto, como antes.
+  function crearSeccionPlegable(titulo, abiertoPorDefecto){
     var headerBtn = document.createElement("button");
     headerBtn.type = "button";
     headerBtn.className = "seccionPlegableBtn";
-    headerBtn.setAttribute("aria-expanded", "false");
+    headerBtn.setAttribute("aria-expanded", abiertoPorDefecto ? "true" : "false");
     headerBtn.innerHTML = "<span>" + escapeHtml(titulo) + "</span>"
       + "<svg class=\"chev\" width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\" stroke-linejoin=\"round\"><path d=\"M4 6l4 4 4-4\"/></svg>";
 
     var body = document.createElement("div");
     body.className = "seccionPlegableBody";
-    body.style.display = "none";
+    body.style.display = abiertoPorDefecto ? "block" : "none";
 
     headerBtn.addEventListener("click", function(){
       var abierto = body.style.display !== "none";
@@ -2373,7 +2382,7 @@
     var avisoContainer = document.createElement("div");
     bebeModalBody.appendChild(avisoContainer);
 
-    var crecimiento = crearSeccionPlegable("Crecimiento");
+    var crecimiento = crearSeccionPlegable("Crecimiento", true);
     bebeModalBody.appendChild(crecimiento.headerBtn);
     bebeModalBody.appendChild(crecimiento.body);
     var body = crecimiento.body;
@@ -2422,11 +2431,44 @@
     }
   }
 
-  // Contenido del plegable: las 2 gráficas OMS y el botón "Registrar medición".
+  // Contenido del plegable: primero el CTA "Registrar medición" (2026-10-19:
+  // va antes que las gráficas, para que no dependa de hacer scroll más allá
+  // de 2 gráficas vacías), y debajo las 2 gráficas OMS.
   function pintarCrecimientoBody(body, bebe, mediciones, reload){
     body.innerHTML = "";
     var nacimiento = new Date(bebe.fecha_nacimiento + "T00:00:00");
     var claveSexo = sexoAClaveOMS(bebe.sexo);
+    var nombre = bebe.nombre || "tu bebé";
+
+    // CTA + formulario para registrar una medición nueva — primero en el
+    // plegable, no después de las gráficas.
+    var ctaBox = document.createElement("div");
+    ctaBox.className = "crecimientoCTA";
+    var ctaTexto = document.createElement("p");
+    ctaTexto.textContent = "¿Ya pesaste o mediste a " + nombre + " este mes?";
+    ctaBox.appendChild(ctaTexto);
+    var toggleBtn = document.createElement("button");
+    toggleBtn.type = "button";
+    toggleBtn.className = "btnPrimary";
+    toggleBtn.style.display = "flex";
+    toggleBtn.style.alignItems = "center";
+    toggleBtn.style.justifyContent = "center";
+    toggleBtn.style.gap = "7px";
+    toggleBtn.innerHTML = "<svg width=\"15\" height=\"15\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M8 3v10M3 8h10\"/></svg> Registrar medición";
+    var formBox = document.createElement("div");
+    formBox.style.display = "none";
+    toggleBtn.addEventListener("click", function(){
+      var abierto = formBox.style.display !== "none";
+      formBox.style.display = abierto ? "none" : "block";
+    });
+    ctaBox.appendChild(toggleBtn);
+    ctaBox.appendChild(formBox);
+    body.appendChild(ctaBox);
+    renderCrecimientoForm(formBox, bebe, function(){
+      formBox.style.display = "none";
+      formBox.innerHTML = "";
+      reload();
+    });
 
     // Contenedor de gráficas — id="crecimientoGrafica" para medición (Analítica).
     var graficaBox = document.createElement("div");
@@ -2457,26 +2499,6 @@
     fuente.className = "crecimientoFuente";
     fuente.textContent = "Fuente: Curvas de crecimiento infantil de la OMS (who.int/tools/child-growth-standards), 0-24 meses.";
     body.appendChild(fuente);
-
-    // Botón + formulario para registrar una medición nueva.
-    var toggleBtn = document.createElement("button");
-    toggleBtn.type = "button";
-    toggleBtn.className = "btnGhost";
-    toggleBtn.style.marginBottom = "4px";
-    toggleBtn.innerHTML = "<svg width=\"15\" height=\"15\" viewBox=\"0 0 16 16\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.8\"><path d=\"M8 3v10M3 8h10\"/></svg> Registrar medición";
-    var formBox = document.createElement("div");
-    formBox.style.display = "none";
-    toggleBtn.addEventListener("click", function(){
-      var abierto = formBox.style.display !== "none";
-      formBox.style.display = abierto ? "none" : "block";
-    });
-    body.appendChild(toggleBtn);
-    body.appendChild(formBox);
-    renderCrecimientoForm(formBox, bebe, function(){
-      formBox.style.display = "none";
-      formBox.innerHTML = "";
-      reload();
-    });
   }
 
   // Historial de registros — siempre visible (fuera del plegable), más

@@ -195,10 +195,16 @@ window.dataLayer = window.dataLayer || [];
     // 3) [ANALÍTICA] Gráfica de crecimiento vista: se detecta cuando la página
     // dibuja #crecimientoGrafica (un evento por apertura; los redibujos al
     // guardar o borrar una medición dentro de 30 s no se cuentan de nuevo).
+    // Corrección 2026-10-19: el bloque se inserta en el DOM en cuanto se abre
+    // el perfil del bebé, aunque la sección "Crecimiento" siga plegada (el
+    // plegado es solo display:none en un ancestro) — antes esto disparaba el
+    // evento sin que nadie viera la gráfica realmente. offsetParent es null
+    // cuando el elemento (o un ancestro) tiene display:none, así que ahora
+    // solo se cuenta si de verdad está visible en pantalla.
     var ultimaGrafica = 0, nodoGrafica = null;
     function revisarGrafica() {
       var el = document.getElementById('crecimientoGrafica');
-      if (el && el !== nodoGrafica) {          // solo cuando se dibuja de nuevo
+      if (el && el !== nodoGrafica && el.offsetParent !== null) {
         nodoGrafica = el;
         if (Date.now() - ultimaGrafica > 30000) {
           ultimaGrafica = Date.now();
