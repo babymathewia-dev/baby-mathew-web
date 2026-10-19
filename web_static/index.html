@@ -2981,69 +2981,90 @@
     });
   }
 
+  // Una tarjeta de cita (reutilizada tanto en la lista vigente como en el
+  // Historial). "hoy" se pasa una sola vez desde renderAgendaLista.
+  function crearCitaCard(c, hoy){
+    var card = document.createElement("div");
+    card.className = "citaCard" + (c.estado === "realizada" || c.estado === "cancelada" || c.fecha < hoy ? " pasada" : "");
+    var pills = "<span class=\"pillTag\">" + escapeHtml(c.especialidad) + "</span>";
+    if (c.estado === "realizada") pills += " <span class=\"pillTag\">Realizada</span>";
+    else if (c.estado === "cancelada") pills += " <span class=\"pillTag\">Cancelada</span>";
+    else if (c.fecha < hoy) pills += " <span class=\"pillTag\">No marcada</span>";
+    else if (c.avisarme) pills += " <span class=\"pillTag alerta\">🔔 Avisarme</span>";
+
+    var datos = [];
+    if (c.valor) datos.push("💲 " + escapeHtml(c.valor));
+    var lugarLinea = [c.medico, c.lugar].filter(Boolean).map(escapeHtml).join(" · ");
+
+    card.innerHTML =
+      "<div class=\"meta\">" + pills + "</div>"
+      + "<p class=\"fecha\">" + escapeHtml(fmtFecha(c.fecha)) + (c.hora ? " · " + escapeHtml(c.hora) : "") + "</p>"
+      + (lugarLinea ? "<p class=\"lugar\">" + lugarLinea + "</p>" : "")
+      + "<div class=\"meta\"><div class=\"datos\">" + datos.join(" ") + "</div>"
+      + "<span class=\"quienAgrego\"><span class=\"avatarDot\" style=\"background:" + avatarColorFor(c.creado_por_nombre) + "\">" + inicialesDe(c.creado_por_nombre) + "</span>" + escapeHtml(c.creado_por_nombre || "") + "</span></div>";
+
+    var actions = document.createElement("div");
+    actions.className = "citaActions";
+    var editarBtn = document.createElement("button");
+    editarBtn.type = "button";
+    editarBtn.textContent = "Editar cita";
+    editarBtn.addEventListener("click", function(){
+      renderAgendaForm(c);
+    });
+    actions.appendChild(editarBtn);
+
+    if (c.estado === "pendiente" && c.fecha >= hoy) {
+      var realizadaBtn = document.createElement("button");
+      realizadaBtn.type = "button";
+      realizadaBtn.textContent = "Marcar realizada";
+      realizadaBtn.addEventListener("click", function(){
+        fetch("/api/citas/" + c.id, {
+          method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "realizada" })
+        }).then(function(){ cargarCitas(); });
+      });
+      actions.appendChild(realizadaBtn);
+    }
+
+    var delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "danger";
+    delBtn.textContent = "Eliminar";
+    delBtn.addEventListener("click", function(){
+      if (!confirm("¿Eliminar esta cita?")) return;
+      fetch("/api/citas/" + c.id, { method: "DELETE" }).then(function(){ cargarCitas(); });
+    });
+    actions.appendChild(delBtn);
+
+    card.appendChild(actions);
+    return card;
+  }
+
+  // 2026-10-19: separa las citas vigentes (pendientes y aún no vencidas) del
+  // Historial (realizadas, canceladas o con fecha ya pasada), para que una
+  // cita marcada como realizada no empuje hacia abajo a las que siguen
+  // agendadas. El Historial queda plegado por defecto, igual que el de
+  // Crecimiento en el perfil del bebé.
   function renderAgendaLista(citas){
     agendaContentEl.innerHTML = "";
-    if (!citas.length) {
+    var hoy = new Date().toISOString().slice(0, 10);
+    var vigentes = citas.filter(function(c){ return c.estado === "pendiente" && c.fecha >= hoy; });
+    var historial = citas.filter(function(c){ return !(c.estado === "pendiente" && c.fecha >= hoy); })
+      .slice().reverse(); // más reciente primero
+
+    if (!vigentes.length) {
       var empty = document.createElement("div");
       empty.className = "emptyState";
-      empty.textContent = "Todavía no hay citas agendadas.";
+      empty.textContent = citas.length ? "No hay citas pendientes por venir." : "Todavía no hay citas agendadas.";
       agendaContentEl.appendChild(empty);
     } else {
-      var hoy = new Date().toISOString().slice(0, 10);
-      citas.forEach(function(c){
-        var card = document.createElement("div");
-        card.className = "citaCard" + (c.estado === "realizada" || c.estado === "cancelada" ? " pasada" : "");
-        var pills = "<span class=\"pillTag\">" + escapeHtml(c.especialidad) + "</span>";
-        if (c.estado === "realizada") pills += " <span class=\"pillTag\">Realizada</span>";
-        else if (c.estado === "cancelada") pills += " <span class=\"pillTag\">Cancelada</span>";
-        else if (c.avisarme) pills += " <span class=\"pillTag alerta\">🔔 Avisarme</span>";
+      vigentes.forEach(function(c){ agendaContentEl.appendChild(crearCitaCard(c, hoy)); });
+    }
 
-        var datos = [];
-        if (c.valor) datos.push("💲 " + escapeHtml(c.valor));
-        var lugarLinea = [c.medico, c.lugar].filter(Boolean).map(escapeHtml).join(" · ");
-
-        card.innerHTML =
-          "<div class=\"meta\">" + pills + "</div>"
-          + "<p class=\"fecha\">" + escapeHtml(fmtFecha(c.fecha)) + (c.hora ? " · " + escapeHtml(c.hora) : "") + "</p>"
-          + (lugarLinea ? "<p class=\"lugar\">" + lugarLinea + "</p>" : "")
-          + "<div class=\"meta\"><div class=\"datos\">" + datos.join(" ") + "</div>"
-          + "<span class=\"quienAgrego\"><span class=\"avatarDot\" style=\"background:" + avatarColorFor(c.creado_por_nombre) + "\">" + inicialesDe(c.creado_por_nombre) + "</span>" + escapeHtml(c.creado_por_nombre || "") + "</span></div>";
-
-        var actions = document.createElement("div");
-        actions.className = "citaActions";
-        var editarBtn = document.createElement("button");
-        editarBtn.type = "button";
-        editarBtn.textContent = "Editar cita";
-        editarBtn.addEventListener("click", function(){
-          renderAgendaForm(c);
-        });
-        actions.appendChild(editarBtn);
-
-        if (c.estado === "pendiente" && c.fecha >= hoy) {
-          var realizadaBtn = document.createElement("button");
-          realizadaBtn.type = "button";
-          realizadaBtn.textContent = "Marcar realizada";
-          realizadaBtn.addEventListener("click", function(){
-            fetch("/api/citas/" + c.id, {
-              method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "realizada" })
-            }).then(function(){ cargarCitas(); });
-          });
-          actions.appendChild(realizadaBtn);
-        }
-
-        var delBtn = document.createElement("button");
-        delBtn.type = "button";
-        delBtn.className = "danger";
-        delBtn.textContent = "Eliminar";
-        delBtn.addEventListener("click", function(){
-          if (!confirm("¿Eliminar esta cita?")) return;
-          fetch("/api/citas/" + c.id, { method: "DELETE" }).then(function(){ cargarCitas(); });
-        });
-        actions.appendChild(delBtn);
-
-        card.appendChild(actions);
-        agendaContentEl.appendChild(card);
-      });
+    if (historial.length) {
+      var seccion = crearSeccionPlegable("Historial (" + historial.length + ")", false);
+      agendaContentEl.appendChild(seccion.headerBtn);
+      agendaContentEl.appendChild(seccion.body);
+      historial.forEach(function(c){ seccion.body.appendChild(crearCitaCard(c, hoy)); });
     }
 
     var fab = document.createElement("button");
