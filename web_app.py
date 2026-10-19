@@ -22,6 +22,7 @@ import base64
 import logging
 import secrets
 import sqlite3
+import calendar
 from html import escape as _escape_html
 from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
@@ -596,6 +597,17 @@ def init_db():
             UNIQUE (medicamento_id, fecha_envio)
         )"""
     )
+    # Registro de correos de "cumplemés" ya enviados (1 a 24 meses), para no
+    # duplicar si el Cron Job de las 8am corre más de una vez el mismo día.
+    conn.execute(
+        """CREATE TABLE IF NOT EXISTS hito_avisos_enviados (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            bebe_id INTEGER NOT NULL REFERENCES bebes(id),
+            fecha_envio TEXT NOT NULL,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE (bebe_id, fecha_envio)
+        )"""
+    )
     # Registro de crecimiento (peso/talla/perímetro cefálico). Datos de salud
     # del menor — sensibles bajo la Ley 1581 de 2012 (arts. 5 y 7); requieren
     # autorización expresa del representante legal (ver /terminos.html y
@@ -948,7 +960,7 @@ def _contexto_bebe(conn, user_id):
     if not bebe:
         return None
 
-    hoy = date.today()
+    hoy = datetime.now(BOGOTA_TZ).date()
     partes = []
 
     if bebe["etapa"] == "nacido" and bebe["fecha_nacimiento"]:
@@ -1108,6 +1120,7 @@ def api_bebe_delete():
     conn.execute("DELETE FROM medicamentos WHERE bebe_id = ?", (bebe_id,))
     conn.execute("DELETE FROM cita_avisos_enviados WHERE cita_id IN (SELECT id FROM citas WHERE bebe_id = ?)", (bebe_id,))
     conn.execute("DELETE FROM citas WHERE bebe_id = ?", (bebe_id,))
+    conn.execute("DELETE FROM hito_avisos_enviados WHERE bebe_id = ?", (bebe_id,))
     conn.execute("DELETE FROM bebe_invitaciones WHERE bebe_id = ?", (bebe_id,))
     conn.execute("DELETE FROM bebe_cuidadores WHERE bebe_id = ?", (bebe_id,))
     conn.execute("DELETE FROM bebes WHERE id = ?", (bebe_id,))
@@ -1520,7 +1533,7 @@ def api_crecimiento_create():
         fecha_nacimiento_dt = date.fromisoformat(bebe["fecha_nacimiento"])
     except (ValueError, TypeError):
         fecha_nacimiento_dt = None
-    if fecha_dt > date.today():
+    if fecha_dt > datetime.now(BOGOTA_TZ).date():
         conn.close()
         return jsonify({"error": "fecha_futura"}), 400
     if fecha_nacimiento_dt and fecha_dt < fecha_nacimiento_dt:
@@ -1642,11 +1655,13 @@ def api_notas_delete(nota_id):
 
 
 # ---------------------------------------------------------------------------
-# Recordatorios por correo: citas (6pm de la noche anterior) y medicamentos
-# (30 minutos antes de la hora configurada por el cuidador). Son dos Cron
-# Jobs separados en Render que llaman a este mismo endpoint con ?tipo=citas
-# o ?tipo=medicamentos -- citas corre una vez al día a las 6pm, medicamentos
-# corre cada 5 minutos (porque la hora de cada medicamento es distinta).
+# Recordatorios por correo: citas (6pm de la noche anterior), medicamentos
+# (30 minutos antes de la hora configurada por el cuidador) e hitos/cumplemés
+# (8am, el día del aniversario mensual del bebé). Son tres Cron Jobs
+# separados en Render que llaman a este mismo endpoint con ?tipo=citas,
+# ?tipo=medicamentos o ?tipo=hitos -- citas y hitos corren una vez al día (6pm
+# y 8am respectivamente), medicamentos corre cada 5 minutos (porque la hora
+# de cada medicamento es distinta).
 # ---------------------------------------------------------------------------
 BOGOTA_TZ = ZoneInfo("America/Bogota")
 
@@ -1845,12 +1860,212 @@ def _enviar_recordatorios_medicamentos(conn, ventana_minutos=5):
     return {"medicamentos_procesados": procesados, "correos_enviados": enviados, "correos_fallidos": fallidos}
 
 
+# ---------------------------------------------------------------------------
+# Correo de "cumplemés": avances y qué esperar en el nuevo mes de vida del
+# bebé (1 a 24 meses, el mismo rango que cubre el agente). Corre una vez al
+# día a las 8am hora Bogotá -- un Cron Job de Render más, igual a los de
+# citas/medicamentos, con ?tipo=hitos. El contenido está agrupado por las
+# mismas bandas de edad que kb_lactante.md y kb_infante_mayor.md (no se
+# inventa detalle mes a mes que no esté respaldado por esas fuentes).
+# ---------------------------------------------------------------------------
+
+_HAB = lambda titulo, desc: {"titulo": titulo, "desc": desc}  # noqa: E731
+
+MESES_CONTENIDO = {
+    1: {
+        "esperar": "Este primer mes es, sobre todo, de adaptación: tu bebé se acostumbra a la vida fuera del vientre. Es normal el reflejo de Moro (se sobresalta y abre los brazos ante un ruido fuerte) y que fije la mirada solo unos segundos. El cordón umbilical ya debió caerse o está por caer.",
+        "sueno": "Duerme entre 14 y 17 horas al día, en bloques cortos de 2 a 4 horas, y todavía no distingue el día de la noche — es esperable, no hay nada que \"corregir\" a esta edad.",
+        "hab1": _HAB("Reflejo de Moro", "Se sobresalta y abre los brazos ante un sonido fuerte. Es un reflejo normal del recién nacido, no una señal de alarma."),
+        "hab2": _HAB("Mirada que se fija", "Por unos segundos logra fijar la mirada en un rostro cercano, sobre todo el tuyo."),
+    },
+    2: {
+        "esperar": "¡Llegó la sonrisa social! Ya no es solo un reflejo: tu bebé te sonríe a ti. También empieza a seguir objetos o rostros con la mirada cuando se mueven cerca de él.",
+        "sueno": "Sigue durmiendo en bloques cortos (14-17 horas/día), aunque algunos bebés empiezan a mostrar las primeras señales de organizarse un poco más.",
+        "hab1": _HAB("Sonrisa social", "Te sonríe a ti, no solo como reflejo — es una de las primeras formas reales de comunicación."),
+        "hab2": _HAB("Sigue con la mirada", "Sigue objetos o rostros que se mueven cerca de él."),
+    },
+    3: {
+        "esperar": "Tu bebé gana fuerza: boca abajo, levanta y sostiene la cabeza con más firmeza. Empieza a \"gorjear\" (sonidos vocálicos) y a llevar las manos hacia la línea media de su cuerpo.",
+        "sueno": "Entre los 2 y los 4 meses suele empezar a consolidar periodos más largos de sueño nocturno — 4 a 6 horas seguidas es normal, aunque no todos los bebés lo logran a la misma edad.",
+        "hab1": _HAB("Control de cabeza", "Boca abajo, sostiene la cabeza con más firmeza que el mes pasado."),
+        "hab2": _HAB("Primeros sonidos", "Gorjea y prueba sonidos vocálicos — el inicio del lenguaje."),
+    },
+    4: {
+        "esperar": "Sigue fortaleciendo el control de cabeza y tronco, junta las manos frente a su cuerpo y las mira con curiosidad, y gorjea con más variedad. Es frecuente una \"regresión de sueño\" alrededor de este mes — es un fenómeno conocido y esperado, no un problema a corregir.",
+        "sueno": "Puede notarse un retroceso temporal (más despertares) por la regresión de los 4 meses. Suele pasar sola en unas semanas.",
+        "hab1": _HAB("Manos a la línea media", "Junta las manos frente a su cuerpo y empieza a mirarlas con curiosidad."),
+        "hab2": _HAB("Más vocal", "Gorjea con más variedad e intensidad que el mes anterior."),
+    },
+    5: {
+        "esperar": "Es probable que tu bebé empiece a voltearse (boca abajo a boca arriba o al revés) — a veces sin aviso, así que ojo con dejarlo solo en superficies elevadas. También intenta alcanzar objetos con más intención y ya ríe a carcajadas, no solo sonríe.",
+        "sueno": "Entre los 4 y 6 meses, algunos bebés empiezan a dormir tramos de 6 a 8 horas seguidas. Hay mucha variabilidad individual — no es motivo de alarma si tu bebé aún se despierta seguido.",
+        "hab1": _HAB("Se voltea", "Empieza a girar boca abajo-boca arriba o viceversa. A veces ocurre de un momento a otro."),
+        "hab2": _HAB("Risa a carcajadas", "Ya ríe fuerte, no solo sonríe — disfrútalo."),
+    },
+    6: {
+        "esperar": "Tu bebé extiende el brazo con intención para alcanzar lo que le interesa, y puede mostrar curiosidad cuando te ve comer — una señal de que se acerca la alimentación complementaria, que suele iniciarse alrededor de este mes junto con la lactancia o fórmula, que sigue siendo la base nutricional.",
+        "sueno": "Sigue en el rango de 4-6 meses: algunos ya duermen tramos de 6 a 8 horas, con bastante variabilidad entre bebés.",
+        "hab1": _HAB("Alcanza objetos", "Extiende el brazo con intención para agarrar lo que le llama la atención."),
+        "hab2": _HAB("Curiosidad por la comida", "Puede mostrar interés al verte comer — una señal de que se acerca esta nueva etapa."),
+    },
+    7: {
+        "esperar": "Entramos en una etapa de mucho movimiento: tu bebé empieza a sentarse sin apoyo y a desplazarse (no todos gatean, algunos pasan directo a pararse), transfiere objetos de una mano a otra, y balbucea sílabas repetidas como \"ba-ba\" o \"ma-ma\" (aún sin intención clara). También puede iniciar la dentición en este rango — irritabilidad leve y más salivación son esperables.",
+        "sueno": "Lo más común en este rango es 2 siestas al día, con sueño nocturno de 10 a 12 horas y posibles despertares.",
+        "hab1": _HAB("Memoria y atención", "Empieza a prestar atención intencional a personas y objetos, y retiene información para recordarla después."),
+        "hab2": _HAB("Balbuceo con sílabas", "Repite sílabas como \"ba-ba\" o \"ma-ma\", aún sin intención clara."),
+    },
+    8: {
+        "esperar": "Tu bebé sigue ganando movilidad: se sienta sin apoyo con más soltura, se desplaza por sí mismo (gateando o de otra forma), y puede empezar a mostrar angustia de separación al despedirte — es esperable entre los 8 y 18 meses, no indica un problema.",
+        "sueno": "2 siestas al día sigue siendo lo más común, con 10-12 horas de sueño nocturno y posibles despertares.",
+        "hab1": _HAB("Memoria y atención", "Presta atención intencional a lo que lo rodea y empieza a recordar información."),
+        "hab2": _HAB("Transfiere objetos", "Pasa objetos de una mano a otra con cada vez más control."),
+    },
+    9: {
+        "esperar": "Tu bebé se mueve con más seguridad por su cuenta y balbucea cada vez más. Es un buen momento para revisar la seguridad del hogar (enchufes, objetos pequeños al alcance, muebles asegurados), porque la movilidad va a seguir aumentando rápido.",
+        "sueno": "Aún 2 siestas al día es lo esperable, con sueño nocturno de 10 a 12 horas.",
+        "hab1": _HAB("Desplazamiento propio", "Se mueve por sí mismo para alcanzar lo que le interesa — gateando o a su manera."),
+        "hab2": _HAB("Balbuceo activo", "Balbucea con más frecuencia e intención comunicativa."),
+    },
+    10: {
+        "esperar": "Tu bebé puede ponerse de pie con apoyo y dar pasos sostenido, usa la pinza fina (agarra objetos pequeños con el índice y el pulgar), y puede decir 1-2 palabras con intención, responder a su nombre y señalar para pedir cosas.",
+        "sueno": "Sigue siendo normal 2 siestas al día; hacia el año algunos bebés empiezan a mostrar señales de estar listos para pasar a 1 sola siesta.",
+        "hab1": _HAB("Pinza fina", "Agarra objetos pequeños con el dedo índice y el pulgar."),
+        "hab2": _HAB("Primeras palabras", "Puede decir 1 o 2 palabras con intención y responder a su nombre."),
+    },
+    11: {
+        "esperar": "Tu bebé se para con apoyo cada vez con más confianza y puede intentar algún paso sostenido de tu mano. Señala para pedir cosas y entiende más de lo que puede decir con palabras — es normal que la comprensión vaya adelante del habla.",
+        "sueno": "Todavía 2 siestas al día en la mayoría de los casos, con variabilidad individual.",
+        "hab1": _HAB("Se pone de pie", "Con apoyo, se para con cada vez más confianza."),
+        "hab2": _HAB("Señala para pedir", "Usa el dedo para pedir lo que quiere — una forma temprana de comunicación."),
+    },
+    12: {
+        "esperar": "¡Un año! Tu bebé puede caminar con ayuda o incluso solo (el rango normal es amplio, de 9 a 18 meses, así que no caminar todavía a esta edad no es motivo de preocupación). Dice algunas palabras sueltas y entiende instrucciones simples. Suele ser también el momento de la primera visita al odontólogo.",
+        "sueno": "Empieza la transición gradual de 2 siestas a 1, que suele completarse entre los 12 y 18 meses — es normal un periodo de ajuste con más despertares nocturnos mientras tanto.",
+        "hab1": _HAB("Primeros pasos", "Camina con ayuda o, en algunos casos, ya solo — el rango normal es amplio."),
+        "hab2": _HAB("Entiende más de lo que dice", "Sigue instrucciones sencillas de un paso, aunque hable poco todavía."),
+    },
+}
+
+# 13-18 meses: comparten banda de desarrollo ("12-18 meses" de kb_infante_mayor).
+for _m in range(13, 19):
+    MESES_CONTENIDO[_m] = {
+        "esperar": "Tu bebé camina de forma cada vez más independiente (recuerda que el rango normal va de 9 a 18 meses), dice varias palabras sueltas, sigue instrucciones sencillas de un paso e imita lo que hace a diario — como \"hablar\" por teléfono o barrer.",
+        "sueno": "Sigue la transición de 2 siestas a 1, que se completa en algún punto de este rango. Es normal un periodo de más despertares nocturnos mientras el cuerpo se ajusta al nuevo ritmo.",
+        "hab1": _HAB("Camina", "La mayoría ya camina sin apoyo en este rango — el normal va de 9 a 18 meses."),
+        "hab2": _HAB("Imita lo que ve", "Imita acciones cotidianas tuyas, como \"hablar\" por teléfono o barrer."),
+    }
+
+# 19-24 meses: comparten banda de desarrollo ("18-24 meses" de kb_infante_mayor).
+for _m in range(19, 25):
+    MESES_CONTENIDO[_m] = {
+        "esperar": "Tu bebé corre, sube escalones con ayuda, combina 2 palabras (\"quiero agua\"), identifica partes de su cuerpo y empieza el juego simbólico (por ejemplo, finge darle de comer a un muñeco). Hacia el final de este rango son frecuentes las primeras \"rabietas\" — parte normal del desarrollo emocional, no un problema de crianza.",
+        "sueno": "Ya con 1 siesta al día y sueño nocturno de 11 a 12 horas es lo esperable a esta edad.",
+        "hab1": _HAB("Juego simbólico", "Empieza a \"hacer de cuenta\" — por ejemplo, finge darle de comer a un muñeco."),
+        "hab2": _HAB("Combina palabras", "Empieza a unir dos palabras, como \"quiero agua\"."),
+    }
+
+
+def _fecha_aniversario_mensual(fecha_nacimiento, meses):
+    """Fecha del aniversario número 'meses' del nacimiento, ajustando fin de
+    mes (ej. nacido el 31 de enero -> el aniversario de abril cae el 30,
+    porque abril no tiene día 31)."""
+    total = fecha_nacimiento.month + meses
+    anniv_year = fecha_nacimiento.year + (total - 1) // 12
+    anniv_month = (total - 1) % 12 + 1
+    ultimo_dia_mes = calendar.monthrange(anniv_year, anniv_month)[1]
+    anniv_day = min(fecha_nacimiento.day, ultimo_dia_mes)
+    return date(anniv_year, anniv_month, anniv_day)
+
+
+def _meses_cumplidos_hoy(fecha_nacimiento, hoy):
+    """Si 'hoy' es el aniversario mensual exacto del nacimiento, devuelve el
+    número de meses cumplidos (1-24+); si no, devuelve None."""
+    if hoy < fecha_nacimiento:
+        return None
+    meses = (hoy.year - fecha_nacimiento.year) * 12 + (hoy.month - fecha_nacimiento.month)
+    anniv = _fecha_aniversario_mensual(fecha_nacimiento, meses)
+    if hoy < anniv:
+        meses -= 1
+        anniv = _fecha_aniversario_mensual(fecha_nacimiento, meses)
+    if meses < 1:
+        return None
+    return meses if hoy == anniv else None
+
+
+def _html_hito_mensual(nombre_bebe, meses, contenido):
+    meses_txt = "1 mes" if meses == 1 else f"{meses} meses"
+    img_url = "https://bebeteguia.com/torta-mes.png"
+    return (
+        "<div style=\"font-family:'Source Sans 3',Arial,sans-serif;color:#173330;max-width:480px;margin:0 auto;\">"
+        f"<div style='text-align:center;margin-bottom:6px;'><img src='{img_url}' width='160' height='151' alt='Pastel con una velita' style='display:inline-block;'></div>"
+        f"<h2 style='color:#2B6A67;text-align:center;margin:4px 0 2px;'>🎉 ¡{nombre_bebe} cumple {meses_txt} hoy!</h2>"
+        "<p style='text-align:center;color:#5C7A76;margin:0 0 18px;'>Esto es lo que puedes esperar este nuevo mes de vida</p>"
+        "<h3 style='color:#2B6A67;margin:0 0 6px;font-size:1rem;'>¿Qué cambios puedo esperar?</h3>"
+        f"<p style='background:#EAF6F4;border-radius:10px;padding:12px 14px;margin:0 0 16px;'>{contenido['esperar']}</p>"
+        "<h3 style='color:#2B6A67;margin:0 0 6px;font-size:1rem;'>Sueño</h3>"
+        f"<p style='background:#EAF6F4;border-radius:10px;padding:12px 14px;margin:0 0 16px;'>{contenido['sueno']}</p>"
+        "<h3 style='color:#2B6A67;margin:0 0 10px;font-size:1rem;'>Habilidades nuevas este mes</h3>"
+        f"<p style='margin:0 0 4px;'><strong style='color:#3E8E8A;'>{contenido['hab1']['titulo']}</strong><br>"
+        f"<span style='color:#5C7A76;'>{contenido['hab1']['desc']}</span></p>"
+        f"<p style='margin:12px 0 0;'><strong style='color:#3E8E8A;'>{contenido['hab2']['titulo']}</strong><br>"
+        f"<span style='color:#5C7A76;'>{contenido['hab2']['desc']}</span></p>"
+        "<p style='font-size:.72rem;color:#93ACA8;margin-top:22px;'>Baby Mathew IA · Contenido informativo general, "
+        "orientativo y con variabilidad individual amplia — no reemplaza el control de crecimiento y desarrollo con tu pediatra.</p>"
+        "</div>"
+    )
+
+
+def _enviar_recordatorios_hitos(conn):
+    hoy = datetime.now(BOGOTA_TZ).date()
+    hoy_str = hoy.isoformat()
+    bebes = conn.execute(
+        "SELECT id, nombre, fecha_nacimiento FROM bebes WHERE etapa = 'nacido' AND fecha_nacimiento IS NOT NULL"
+    ).fetchall()
+
+    enviados, fallidos, procesados = 0, 0, 0
+    for b in bebes:
+        b = dict(b)
+        try:
+            nacimiento = date.fromisoformat(b["fecha_nacimiento"])
+        except (ValueError, TypeError):
+            continue
+        meses = _meses_cumplidos_hoy(nacimiento, hoy)
+        if meses is None or meses > 24:
+            continue  # no es el aniversario mensual de hoy, o ya pasó el alcance del MVP (24 meses)
+        contenido = MESES_CONTENIDO.get(meses)
+        if not contenido:
+            continue
+        if _ya_enviado(conn, "hito_avisos_enviados", "bebe_id", b["id"], hoy_str):
+            continue
+        cuidadores = _cuidadores_de(conn, b["id"])
+        if not cuidadores:
+            continue
+        nombre_bebe = b["nombre"] or "tu bebé"
+        html = _html_hito_mensual(nombre_bebe, meses, contenido)
+        meses_txt = "1 mes" if meses == 1 else f"{meses} meses"
+        asunto = f"🎉 ¡{nombre_bebe} cumple {meses_txt} hoy!"
+        procesados += 1
+        exito_alguno = False
+        for cuidador in cuidadores:
+            if not cuidador.get("email"):
+                continue
+            if _enviar_correo(cuidador["email"], asunto, html):
+                enviados += 1
+                exito_alguno = True
+            else:
+                fallidos += 1
+        if exito_alguno:
+            _marcar_enviado(conn, "hito_avisos_enviados", "bebe_id", b["id"], hoy_str)
+    return {"hitos_procesados": procesados, "correos_enviados": enviados, "correos_fallidos": fallidos}
+
+
 @app.route("/api/tareas/enviar-alertas", methods=["POST"])
 def api_tareas_enviar_alertas():
     """Dispara el envío de recordatorios. Protegido por un token secreto
     (header X-Tarea-Token) — pensado para Cron Jobs de Render, no para el
-    navegador del usuario. ?tipo=citas o ?tipo=medicamentos corre solo esa
-    parte (son dos Cron Jobs con horarios distintos); sin ?tipo, corre ambas
+    navegador del usuario. ?tipo=citas, ?tipo=medicamentos o ?tipo=hitos
+    corre solo esa parte (son Cron Jobs separados con horarios distintos:
+    citas 6pm, medicamentos cada 5 min, hitos 8am); sin ?tipo, corre las tres
     (uso manual / pruebas)."""
     token_recibido = request.headers.get("X-Tarea-Token", "")
     if not TAREAS_SECRET_TOKEN or not secrets.compare_digest(token_recibido, TAREAS_SECRET_TOKEN):
@@ -1863,6 +2078,8 @@ def api_tareas_enviar_alertas():
         resultado["citas"] = _enviar_recordatorios_citas(conn)
     if tipo in ("", "medicamentos"):
         resultado["medicamentos"] = _enviar_recordatorios_medicamentos(conn)
+    if tipo in ("", "hitos"):
+        resultado["hitos"] = _enviar_recordatorios_hitos(conn)
     conn.close()
     return jsonify(resultado)
 
