@@ -208,6 +208,8 @@
   .gCard--sueno .gCardCta{background:#3E5E8E;}
   .gCard--lactancia .gCardThumb{background:linear-gradient(165deg,#7A2142 0%,#A83A5C 55%,#C96E86 100%);}
   .gCard--lactancia .gCardCta{background:#A83A5C;}
+  .gCard--papa .gCardThumb{background:linear-gradient(165deg,#8A5A12 0%,#B9842B 55%,#E3B35C 100%);}
+  .gCard--papa .gCardCta{background:#B9842B;}
 
   header{
     flex:0 0 auto; padding:14px 18px 12px; background:var(--surface);
@@ -764,6 +766,19 @@
                   <div class="gCardBody">
                     <h3>Lactancia sin angustia: tus primeros 6 meses</h3>
                     <p>Agarre, producción, grietas y vuelta al trabajo sin culpa.</p>
+                    <div class="gCardMeta">
+                      <span class="gCardPrice">🎁 Gratis</span>
+                      <span class="gCardCta">Descargar</span>
+                    </div>
+                  </div>
+                </a>
+                <a class="gCard gCard--papa" id="guiaPapa" href="/guia-papa.pdf" download="Papa-primerizo-Baby-Mathew-IA.pdf">
+                  <div class="gCardThumb">
+                    <img src="/guia-papa.jpg" alt="Portada: Papá primerizo" width="56" height="72" loading="lazy">
+                  </div>
+                  <div class="gCardBody">
+                    <h3>Papá primerizo: tu papel en las primeras semanas</h3>
+                    <p>Apoyo a tu pareja, cuidados del bebé, el tetero y tus derechos como papá.</p>
                     <div class="gCardMeta">
                       <span class="gCardPrice">🎁 Gratis</span>
                       <span class="gCardCta">Descargar</span>
@@ -1785,7 +1800,7 @@
   document.getElementById("menuTikTok").addEventListener("click", function(){
     closeMoreMenu();
   });
-  ["guiaEmbarazo", "guiaSueno", "guiaLactancia"].forEach(function(id){
+  ["guiaEmbarazo", "guiaSueno", "guiaLactancia", "guiaPapa"].forEach(function(id){
     var el = document.getElementById(id);
     if (el) el.addEventListener("click", function(){ closeMoreMenu(); });
   });
