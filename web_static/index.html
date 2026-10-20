@@ -144,6 +144,17 @@
   .menuAccordion[open] .chev{transform:rotate(180deg);}
   .menuAccordion[open] summary{background:var(--surface-alt);}
   .menuAccordionBody{padding:2px 8px 14px;}
+  .menuAccordion--cta summary{
+    background:linear-gradient(135deg, var(--surface-alt), var(--surface));
+    border:1.5px solid var(--primary); font-weight:800; color:var(--primary-dark);
+  }
+  .menuAccordion--cta summary:hover, .menuAccordion--cta summary:focus-visible{background:var(--surface-alt);}
+  .menuAccordion--cta[open] summary{background:var(--surface-alt);}
+  .menuAccordion--cta .ctaLabel{display:flex; align-items:center; gap:8px; flex:1; min-width:0;}
+  .menuAccordion--cta .ctaBadge{
+    font-size:.64rem; font-weight:700; color:#FFFFFF; background:var(--primary);
+    padding:3px 9px; border-radius:999px; white-space:nowrap;
+  }
   #sideMenuFooter{
     flex:0 0 auto; margin-top:auto; padding:14px 18px calc(16px + env(safe-area-inset-bottom,0px));
     border-top:1px solid var(--border); font-size:.72rem; color:var(--text-muted); line-height:1.5;
@@ -166,7 +177,7 @@
   #sideMenu .lContactForm{max-width:none; margin-top:4px; gap:10px;}
   #sideMenu .lContactForm p{text-align:left;}
 
-  /* Guías premium (Hotmart) dentro del menú lateral. */
+  /* Guías gratuitas (PDF descargable) dentro del menú lateral. */
   .gCards{display:flex; flex-direction:column; gap:8px; margin-top:6px;}
   .gCard{
     display:flex; gap:10px; align-items:stretch; background:var(--surface);
@@ -712,58 +723,55 @@
         </div>
       </details>
 
-      <details class="menuAccordion">
-        <summary>Guías para ti<svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
+      <details class="menuAccordion menuAccordion--cta">
+        <summary><span class="ctaLabel">🎁 Guías gratis <span class="ctaBadge">Gratis</span></span><svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></summary>
         <div class="menuAccordionBody">
           <div class="lSection">
             <div class="lWrap">
-              <h2>Guías para ti</h2>
-              <p class="lLead" style="margin-bottom:4px;">Guías descargables en PDF, hechas por Baby Mathew IA. Un pago único, tuyas para siempre.</p>
+              <h2>Guías gratis</h2>
+              <p class="lLead" style="margin-bottom:4px;">Guías descargables en PDF, hechas por Baby Mathew IA. Un plus de la aplicación, sin costo.</p>
               <div class="gCards">
-                <a class="gCard gCard--embarazo" id="guiaEmbarazo" href="https://go.hotmart.com/O108044399T" target="_blank" rel="noopener">
+                <a class="gCard gCard--embarazo" id="guiaEmbarazo" href="/guia-embarazo.pdf" download="Como-tener-un-embarazo-saludable-Baby-Mathew-IA.pdf">
                   <div class="gCardThumb">
                     <img src="/guia-embarazo.jpg" alt="Portada: Cómo tener un embarazo saludable" width="56" height="72" loading="lazy">
-                    <span class="gCardLock" aria-hidden="true"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
                   </div>
                   <div class="gCardBody">
                     <h3>Cómo tener un embarazo saludable</h3>
                     <p>Trimestre a trimestre: qué esperar, qué priorizar y señales de alarma.</p>
                     <div class="gCardMeta">
-                      <span class="gCardPrice">$9.900 COP</span>
-                      <span class="gCardCta">Ver guía</span>
+                      <span class="gCardPrice">🎁 Gratis</span>
+                      <span class="gCardCta">Descargar</span>
                     </div>
                   </div>
                 </a>
-                <a class="gCard gCard--sueno" id="guiaSueno" href="https://go.hotmart.com/U108044585H" target="_blank" rel="noopener">
+                <a class="gCard gCard--sueno" id="guiaSueno" href="/guia-sueno.pdf" download="El-sueno-de-tu-bebe-Baby-Mathew-IA.pdf">
                   <div class="gCardThumb">
                     <img src="/guia-sueno.jpg" alt="Portada: El sueño de tu bebé" width="56" height="72" loading="lazy">
-                    <span class="gCardLock" aria-hidden="true"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
                   </div>
                   <div class="gCardBody">
                     <h3>El sueño de tu bebé: la rutina, tu mejor opción</h3>
                     <p>Evolución del sueño mes a mes durante el primer año.</p>
                     <div class="gCardMeta">
-                      <span class="gCardPrice">$9.900 COP</span>
-                      <span class="gCardCta">Ver guía</span>
+                      <span class="gCardPrice">🎁 Gratis</span>
+                      <span class="gCardCta">Descargar</span>
                     </div>
                   </div>
                 </a>
-                <a class="gCard gCard--lactancia" id="guiaLactancia" href="https://go.hotmart.com/X108045459I" target="_blank" rel="noopener">
+                <a class="gCard gCard--lactancia" id="guiaLactancia" href="/guia-lactancia.pdf" download="Lactancia-sin-angustia-Baby-Mathew-IA.pdf">
                   <div class="gCardThumb">
                     <img src="/guia-lactancia.jpg" alt="Portada: Lactancia sin angustia" width="56" height="72" loading="lazy">
-                    <span class="gCardLock" aria-hidden="true"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="#FFFFFF" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg></span>
                   </div>
                   <div class="gCardBody">
                     <h3>Lactancia sin angustia: tus primeros 6 meses</h3>
                     <p>Agarre, producción, grietas y vuelta al trabajo sin culpa.</p>
                     <div class="gCardMeta">
-                      <span class="gCardPrice">$9.900 COP</span>
-                      <span class="gCardCta">Ver guía</span>
+                      <span class="gCardPrice">🎁 Gratis</span>
+                      <span class="gCardCta">Descargar</span>
                     </div>
                   </div>
                 </a>
               </div>
-              <p class="gCardNote">🔒 Al tocar una guía se abre el pago seguro de Hotmart en una pestaña nueva. El PDF llega a tu correo apenas confirmes el pago.</p>
+              <p class="gCardNote">📥 Descarga directa en PDF, sin pago ni registro. Se guarda en tu dispositivo.</p>
             </div>
           </div>
         </div>
