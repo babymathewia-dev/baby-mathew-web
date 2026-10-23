@@ -435,7 +435,7 @@ def get_db():
     return conn
 
 
-TERMS_VERSION = "2026-10-11"  # sube esta fecha cada vez que cambie el texto legal publicado en /terminos.html
+TERMS_VERSION = "2026-10-23"  # sube esta fecha cada vez que cambie el texto legal publicado en /terminos.html
 
 
 def init_db():
