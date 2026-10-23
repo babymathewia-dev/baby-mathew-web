@@ -5,16 +5,54 @@
    Mide cada llamada al bot (/api/chat) y el tema clasificado por el backend.
    No envía el texto de preguntas ni respuestas (dato de salud, Ley 1581/2012).
    ===================================================================== */
+/* [ANALÍTICA v12] Filtro de bots y tráfico interno (2026-10-23)
+   1) Bots: si el visitante es un navegador automatizado (navigator.webdriver)
+      o su identificador (user agent) es de un rastreador, NO se carga GA4 y
+      no se envía ningún evento. El bot sigue viendo la página normal (no se
+      bloquea nada: Google, vistas previas de WhatsApp/redes e IA siguen
+      leyendo el sitio igual que antes). Solo deja de contarse en GA4.
+   2) Tráfico interno: abrir el sitio UNA vez con ?interno=1 marca ese
+      navegador como del equipo (se guarda en el dispositivo). Sus eventos
+      salen con traffic_type=internal para que el filtro "Tráfico interno"
+      de GA4 los excluya. ?interno=0 quita la marca. */
+var BM_ES_BOT = (function () {
+  try {
+    if (navigator.webdriver) return true;
+    var ua = navigator.userAgent || '';
+    if (!ua) return true;
+    return /bot\b|bot\/|crawl|spider|slurp|headless|lighthouse|pagespeed|chrome-lighthouse|phantom|puppeteer|playwright|selenium|preview|facebookexternalhit|facebookcatalog|^whatsapp|embedly|python|curl|wget|httpclient|okhttp|java\/|go-http|axios|node-fetch|scrapy|ahrefs|semrush|mj12|dotbot|bytespider|petalbot|yandex|baidu|duckduck|google-inspectiontool|adsbot|mediapartners|apis-google|feedfetcher|gptbot|chatgpt|claude|anthropic|perplexity|ccbot|amazonbot|applebot|bingpreview|uptime|monitor|statuscake|pingdom/i.test(ua);
+  } catch (e) { return false; }
+})();
+var BM_INTERNO = (function () {
+  try {
+    var m = /[?&]interno=([01])/.exec(location.search);
+    if (m) {
+      if (m[1] === '1') localStorage.setItem('bm_interno', '1');
+      else localStorage.removeItem('bm_interno');
+      // Limpia el parámetro de la URL para que no quede en los informes.
+      var limpia = location.search.replace(/([?&])interno=[01](&|$)/, '$1').replace(/[?&]$/, '');
+      history.replaceState(null, '', location.pathname + limpia + location.hash);
+    }
+    return localStorage.getItem('bm_interno') === '1';
+  } catch (e) { return false; }
+})();
+
+if (BM_ES_BOT) window['ga-disable-G-8M6P16771E'] = true;   // seguro adicional
 (function () {
+  if (BM_ES_BOT) return;   // [ANALÍTICA v12] a los bots no se les carga GA4
   var s = document.createElement('script');
   s.async = true;
   s.src = 'https://www.googletagmanager.com/gtag/js?id=G-8M6P16771E';
   document.head.appendChild(s);
 })();
 window.dataLayer = window.dataLayer || [];
-  function gtag(){dataLayer.push(arguments);}
+  // [ANALÍTICA v12] Para bots gtag() no hace nada: el resto del archivo sigue
+  // funcionando sin errores pero no se registra ningún evento.
+  function gtag(){ if (BM_ES_BOT) return; dataLayer.push(arguments); }
   gtag('js', new Date());
-  gtag('config', 'G-8M6P16771E', { anonymize_ip: true });
+  gtag('config', 'G-8M6P16771E', BM_INTERNO
+    ? { anonymize_ip: true, traffic_type: 'internal' }
+    : { anonymize_ip: true });
 
   (function () {
     var nPregunta = 0;   // número de pregunta dentro de la conversación
