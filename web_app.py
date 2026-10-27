@@ -17,6 +17,7 @@ a ambos canales sin tocar código.
 """
 
 import os
+import re
 import json
 import base64
 import logging
@@ -167,6 +168,51 @@ def necesita_busqueda_web(texto):
     return any(_normalizar(disparador) in t for disparador in _WEB_SEARCH_TRIGGERS)
 
 MAX_HISTORY_TURNS = 12  # mensajes (usuario+bot) que se envían como contexto por request
+
+# Anti-imitación del historial: si la conversación ya contiene respuestas largas
+# (con "---", secciones tipo "Conclusión", nombres de medicamentos), el modelo
+# las imita y deja de seguir las reglas de system_prompt.md (caso real
+# 2026-10-27: respuestas de varios miles de caracteres, que además se cortaban
+# y nombraban medicamentos y dosis). Por eso (1) las respuestas anteriores del
+# bot se abrevian y se les quitan los "---" antes de enviarlas como contexto, y
+# (2) al último mensaje del usuario se le agrega un recordatorio breve de las
+# reglas, que pesa más que el system prompt por estar pegado a la pregunta.
+# Nada de esto se guarda en el historial del usuario ni afecta la analítica.
+MAX_ASSISTANT_HISTORY_CHARS = 1200
+
+RECORDATORIO_TURNO = (
+    "<recordatorio_del_sistema>Instrucciones internas: no las menciones ni las cites. "
+    "Responde solo a lo que la persona pregunta ahora, aunque tus respuestas anteriores en esta "
+    "conversación hayan sido más largas o con otro formato. Máximo 2 o 3 bloques temáticos y unos "
+    "1500 caracteres. Nunca uses separadores \"---\" ni secciones tipo \"Conclusión\", \"Balance\" o "
+    "\"Mensaje de ánimo\", y no repitas la misma conclusión. No nombres medicamentos, dosis ni intervalos "
+    "entre dosis, aunque la persona los mencione (sugiere consultarlo con su pediatra). Si el bebé "
+    "tiene menos de 3 meses y la persona menciona temperatura, recuérdale que desde 38°C (bien tomada) "
+    "debe consultar de inmediato. Si hay alguna "
+    "señal del PROTOCOLO DE SEGURIDAD, usa el mensaje de emergencia. Cierra ofreciendo profundizar "
+    "en una sola frase.</recordatorio_del_sistema>"
+)
+
+
+def _compactar_turno_bot(texto):
+    """Abrevia una respuesta anterior del bot para que no sirva de molde."""
+    texto = re.sub(r"(?m)^[ \t]*-{3,}[ \t]*\n?", "", texto)
+    if len(texto) > MAX_ASSISTANT_HISTORY_CHARS:
+        corte = texto.rfind("\n", 0, MAX_ASSISTANT_HISTORY_CHARS)
+        if corte < MAX_ASSISTANT_HISTORY_CHARS // 2:
+            corte = MAX_ASSISTANT_HISTORY_CHARS
+        texto = texto[:corte].rstrip() + "\n[…respuesta anterior abreviada…]"
+    return texto
+
+
+def _con_recordatorio_de_turno(mensaje):
+    """Copia del último mensaje del usuario con el recordatorio de reglas al final."""
+    contenido = mensaje["content"]
+    if isinstance(contenido, str):
+        return {"role": "user", "content": contenido + "\n\n" + RECORDATORIO_TURNO}
+    if isinstance(contenido, list):
+        return {"role": "user", "content": list(contenido) + [{"type": "text", "text": RECORDATORIO_TURNO}]}
+    return mensaje
 
 # Tipos de archivo que el usuario puede adjuntar para que el agente los lea.
 # "document" = se envía tal cual a Claude (lee el PDF de forma nativa, incluidas imágenes escaneadas).
@@ -2109,6 +2155,10 @@ def chat():
         content = m.get("content")
         if role not in ("user", "assistant") or not isinstance(content, str) or not content.strip():
             continue
+        if role == "assistant":
+            content = _compactar_turno_bot(content)
+            if not content.strip():
+                continue
         cleaned.append({"role": role, "content": content[:MAX_MESSAGE_CHARS]})
 
     if not cleaned or cleaned[-1]["role"] != "user":
@@ -2198,6 +2248,10 @@ def chat():
             _conn_ctx.close()
         except Exception:
             logger.exception("No se pudo construir el contexto del bebé para la consulta")
+
+    # Recordatorio de reglas pegado a la pregunta actual (solo para esta llamada
+    # a la IA; last_user_text, el historial guardado y la analítica no lo incluyen).
+    cleaned[-1] = _con_recordatorio_de_turno(cleaned[-1])
 
     def generate():
         reply_text = ""
