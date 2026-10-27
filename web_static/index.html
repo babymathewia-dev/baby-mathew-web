@@ -467,6 +467,18 @@
   .citaActions{display:flex; gap:14px; margin-top:8px;}
   .citaActions button{border:none; background:none; color:var(--primary-dark); font-size:.76rem; font-weight:700; cursor:pointer; padding:0; text-decoration:underline;}
   .citaActions button.danger{color:var(--danger-text);}
+  /* 2026-10-27: toda la tarjeta de la cita abre su detalle (antes solo "Editar cita") */
+  .citaCard.clickable{cursor:pointer; transition:border-color .15s;}
+  .citaCard.clickable:hover{border-color:var(--primary);}
+  .citaCard.clickable:focus-visible{outline:2px solid var(--primary); outline-offset:2px;}
+  .citaDetalleTop{display:flex; align-items:center; gap:10px; margin:0 0 14px;}
+  .citaDetalleTop .volver{border:none; background:none; color:var(--primary-dark); font-size:.82rem; font-weight:700; cursor:pointer; padding:0;}
+  .citaDetalleTop .titulo{margin:0; font-weight:700; color:var(--text);}
+  .citaDetalle{background:var(--bg); border:1px solid var(--border); border-radius:14px; padding:14px 16px; margin-bottom:14px;}
+  .citaDetalle .fecha{margin:10px 0 12px; font-size:1.02rem; font-weight:700; color:var(--text);}
+  .citaDetalle dl{margin:0;}
+  .citaDetalle dt{font-size:.7rem; font-weight:700; text-transform:uppercase; letter-spacing:.03em; color:var(--text-muted); margin:11px 0 2px;}
+  .citaDetalle dd{margin:0; font-size:.88rem; color:var(--text); white-space:pre-wrap; overflow-wrap:anywhere;}
 
   /* Crecimiento (peso/talla) dentro de "Perfil del bebé" */
   .crecimientoChartWrap{background:var(--bg); border:1px solid var(--border); border-radius:14px; padding:10px 10px 4px; margin-bottom:10px;}
@@ -3030,7 +3042,7 @@
     actions.className = "citaActions";
     var editarBtn = document.createElement("button");
     editarBtn.type = "button";
-    editarBtn.textContent = "Editar cita";
+    editarBtn.textContent = "Ver/editar cita";
     editarBtn.addEventListener("click", function(){
       renderAgendaForm(c);
     });
@@ -3059,7 +3071,96 @@
     actions.appendChild(delBtn);
 
     card.appendChild(actions);
+
+    // Clic en cualquier parte de la tarjeta (menos en los botones de acción)
+    // abre el detalle de la cita; "Editar cita" se conserva como acceso directo.
+    card.classList.add("clickable");
+    card.tabIndex = 0;
+    card.setAttribute("aria-label", "Ver detalle de la cita de " + (c.especialidad || "") + ", " + fmtFecha(c.fecha));
+    card.addEventListener("click", function(e){
+      if (e.target.closest(".citaActions")) return;
+      renderCitaDetalle(c, hoy);
+    });
+    card.addEventListener("keydown", function(e){
+      if (e.target !== card) return;
+      if (e.key === "Enter" || e.key === " ") { e.preventDefault(); renderCitaDetalle(c, hoy); }
+    });
     return card;
+  }
+
+  // Vista de solo lectura con todos los datos de la cita (incluidas las notas,
+  // que la tarjeta no muestra). Desde aquí se puede editar, marcar realizada o eliminar.
+  function renderCitaDetalle(c, hoy){
+    limpiarFab();
+    agendaContentEl.innerHTML = "";
+
+    var top = document.createElement("div");
+    top.className = "citaDetalleTop";
+    var volver = document.createElement("button");
+    volver.type = "button";
+    volver.className = "volver";
+    volver.textContent = "← Volver";
+    volver.addEventListener("click", cargarCitas);
+    var titulo = document.createElement("p");
+    titulo.className = "titulo";
+    titulo.textContent = "Detalle de la cita";
+    top.appendChild(volver);
+    top.appendChild(titulo);
+    agendaContentEl.appendChild(top);
+
+    var pills = "<span class=\"pillTag\">" + escapeHtml(c.especialidad) + "</span>";
+    if (c.estado === "realizada") pills += " <span class=\"pillTag\">Realizada</span>";
+    else if (c.estado === "cancelada") pills += " <span class=\"pillTag\">Cancelada</span>";
+    else if (c.fecha < hoy) pills += " <span class=\"pillTag\">No marcada</span>";
+    else pills += " <span class=\"pillTag\">Pendiente</span>";
+
+    function fila(etiqueta, valor){
+      return valor ? "<dt>" + etiqueta + "</dt><dd>" + escapeHtml(valor) + "</dd>" : "";
+    }
+    var aviso = c.avisarme ? "🔔 Sí, recordatorio por correo la noche anterior (6pm)" : "Sin recordatorio";
+    var detalle = document.createElement("div");
+    detalle.className = "citaDetalle";
+    detalle.innerHTML =
+      "<div>" + pills + "</div>"
+      + "<p class=\"fecha\">" + escapeHtml(fmtFecha(c.fecha)) + (c.hora ? " · " + escapeHtml(c.hora) : "") + "</p>"
+      + "<dl>"
+      + fila("Lugar", c.lugar)
+      + fila("Médico o profesional", c.medico)
+      + fila("Valor (COP)", c.valor)
+      + fila("Recordatorio", aviso)
+      + fila("Notas", c.notas)
+      + fila("Agendada por", c.creado_por_nombre)
+      + "</dl>";
+    agendaContentEl.appendChild(detalle);
+
+    var actions = document.createElement("div");
+    actions.className = "citaActions";
+    var editarBtn = document.createElement("button");
+    editarBtn.type = "button";
+    editarBtn.textContent = "Editar cita";
+    editarBtn.addEventListener("click", function(){ renderAgendaForm(c); });
+    actions.appendChild(editarBtn);
+    if (c.estado === "pendiente" && c.fecha >= hoy) {
+      var realizadaBtn = document.createElement("button");
+      realizadaBtn.type = "button";
+      realizadaBtn.textContent = "Marcar realizada";
+      realizadaBtn.addEventListener("click", function(){
+        fetch("/api/citas/" + c.id, {
+          method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ estado: "realizada" })
+        }).then(function(){ cargarCitas(); });
+      });
+      actions.appendChild(realizadaBtn);
+    }
+    var delBtn = document.createElement("button");
+    delBtn.type = "button";
+    delBtn.className = "danger";
+    delBtn.textContent = "Eliminar";
+    delBtn.addEventListener("click", function(){
+      if (!confirm("¿Eliminar esta cita?")) return;
+      fetch("/api/citas/" + c.id, { method: "DELETE" }).then(function(){ cargarCitas(); });
+    });
+    actions.appendChild(delBtn);
+    agendaContentEl.appendChild(actions);
   }
 
   // 2026-10-19: separa las citas vigentes (pendientes y aún no vencidas) del
