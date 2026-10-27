@@ -2237,6 +2237,18 @@ def chat():
                 for texto in stream.text_stream:
                     reply_text += texto
                     yield f"data: {json.dumps({'delta': texto})}\n\n"
+                # Si el modelo se quedó sin tokens (max_tokens), la respuesta
+                # termina a media palabra sin que el usuario lo note. Se añade
+                # un cierre explícito para que no parezca un error de la app.
+                try:
+                    if stream.get_final_message().stop_reason == "max_tokens":
+                        nota = ("\n\n_(Mi respuesta quedó demasiado larga y se cortó aquí. "
+                                "Escríbeme \"continúa\" y sigo, o dime qué parte te interesa más.)_")
+                        reply_text += nota
+                        yield f"data: {json.dumps({'delta': nota})}\n\n"
+                        logger.warning("respuesta_truncada_max_tokens")
+                except Exception:
+                    logger.exception("No se pudo revisar stop_reason de la respuesta")
         except anthropic.APITimeoutError:
             logger.warning("Timeout llamando a la API de IA (>55s)")
             yield "data: " + json.dumps({
