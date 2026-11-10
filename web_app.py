@@ -2108,6 +2108,117 @@ def _enviar_recordatorios_hitos(conn):
     return {"hitos_procesados": procesados, "correos_enviados": enviados, "correos_fallidos": fallidos}
 
 
+# ---------------------------------------------------------------------------
+# "Hoy con [bebé]": resumen para la pantalla de inicio de quien tiene perfil.
+# Reutiliza el MISMO contenido mensual del correo de cumplemés (MESES_CONTENIDO,
+# respaldado por kb_lactante.md y kb_infante_mayor.md): no se inventa nada
+# nuevo. Solo lectura; no escribe en la base de datos.
+# ---------------------------------------------------------------------------
+
+def _meses_completos(nacimiento, hoy):
+    """Meses cumplidos (0 si aún no cumple el primero)."""
+    if hoy < nacimiento:
+        return 0
+    meses = (hoy.year - nacimiento.year) * 12 + (hoy.month - nacimiento.month)
+    if hoy < _fecha_aniversario_mensual(nacimiento, meses):
+        meses -= 1
+    return max(meses, 0)
+
+
+def _edad_texto(nacimiento, hoy):
+    dias = (hoy - nacimiento).days
+    if dias < 14:
+        return f"{dias} día" + ("" if dias == 1 else "s")
+    meses = _meses_completos(nacimiento, hoy)
+    if meses < 1:
+        semanas = dias // 7
+        return f"{semanas} semanas"
+    texto = "1 mes" if meses == 1 else f"{meses} meses"
+    resto = (hoy - _fecha_aniversario_mensual(nacimiento, meses)).days
+    semanas = resto // 7
+    if semanas >= 1:
+        texto += " y 1 semana" if semanas == 1 else f" y {semanas} semanas"
+    return texto
+
+
+@app.route("/api/hoy", methods=["GET"])
+@limiter.limit("60 per hour")
+def api_hoy():
+    if "user_id" not in session:
+        return jsonify({"error": "not_logged_in"}), 401
+    conn = get_db()
+    bebe_id = _mi_bebe_id(conn, session["user_id"])
+    if not bebe_id:
+        conn.close()
+        return jsonify({"bebe": None})
+    bebe = conn.execute(
+        """SELECT nombre, etapa, semana_gestacion, fecha_parto_probable, fecha_nacimiento
+           FROM bebes WHERE id = ?""",
+        (bebe_id,),
+    ).fetchone()
+    if not bebe:
+        conn.close()
+        return jsonify({"bebe": None})
+
+    hoy = datetime.now(BOGOTA_TZ).date()
+    resultado = {"nombre": bebe["nombre"] or "", "etapa": bebe["etapa"]}
+
+    if bebe["etapa"] == "nacido" and bebe["fecha_nacimiento"]:
+        try:
+            nacimiento = date.fromisoformat(bebe["fecha_nacimiento"])
+        except (ValueError, TypeError):
+            nacimiento = None
+        if nacimiento and nacimiento <= hoy:
+            meses = _meses_completos(nacimiento, hoy)
+            resultado["edad_texto"] = _edad_texto(nacimiento, hoy)
+            resultado["meses"] = meses
+            # Menos de 1 mes cumplido: se muestra el contenido del primer mes.
+            contenido = MESES_CONTENIDO.get(max(1, meses)) if meses <= 24 else None
+            if contenido:
+                resultado["contenido"] = {
+                    "esperar": contenido["esperar"],
+                    "sueno": contenido["sueno"],
+                    "hab1": contenido["hab1"],
+                    "hab2": contenido["hab2"],
+                }
+    elif bebe["etapa"] == "gestacion":
+        semana = bebe["semana_gestacion"]
+        fpp = bebe["fecha_parto_probable"]
+        if fpp:
+            try:
+                parto = date.fromisoformat(fpp)
+                semana = max(1, min(42, round(40 - (parto - hoy).days / 7)))
+            except (ValueError, TypeError):
+                pass
+        if semana:
+            resultado["semana"] = int(semana)
+            resultado["edad_texto"] = f"Semana {int(semana)} de embarazo"
+
+    cita = conn.execute(
+        """SELECT id, especialidad, fecha, hora, lugar FROM citas
+           WHERE bebe_id = ? AND estado = 'pendiente' AND fecha >= ?
+           ORDER BY fecha ASC, hora ASC LIMIT 1""",
+        (bebe_id, hoy.isoformat()),
+    ).fetchone()
+    if cita:
+        resultado["proxima_cita"] = dict(cita)
+        try:
+            resultado["proxima_cita"]["dias"] = (date.fromisoformat(cita["fecha"]) - hoy).days
+        except (ValueError, TypeError):
+            pass
+
+    ultimo = conn.execute(
+        """SELECT fecha, peso_g, talla_mm FROM crecimiento WHERE bebe_id = ?
+           ORDER BY fecha DESC, id DESC LIMIT 1""",
+        (bebe_id,),
+    ).fetchone()
+    if ultimo and (ultimo["peso_g"] or ultimo["talla_mm"]):
+        resultado["ultima_medicion"] = dict(ultimo)
+
+    conn.close()
+    return jsonify({"bebe": resultado})
+
+
 @app.route("/api/tareas/enviar-alertas", methods=["POST"])
 def api_tareas_enviar_alertas():
     """Dispara el envío de recordatorios. Protegido por un token secreto
