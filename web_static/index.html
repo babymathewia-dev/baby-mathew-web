@@ -387,6 +387,27 @@
     display:flex; align-items:center; justify-content:center; cursor:pointer;
   }
   /* Modal de aceptación de Términos y Política de Datos (num. 2 y 16) */
+  /* --- Tarjeta "Hoy con [bebé]" y ofertas dentro del chat --- */
+  #hoyCard{background:var(--surface-alt); border:1px solid var(--border); border-radius:16px; padding:14px 14px 10px; margin:0 0 16px; text-align:left;}
+  #hoyCard h3{margin:0; font-size:1.02rem; color:var(--primary-dark);}
+  #hoyCard .hoyEdad{font-size:.82rem; color:var(--text-muted); margin:2px 0 8px;}
+  #hoyCard .hoyRow{display:flex; gap:10px; align-items:flex-start; padding:9px 0; border-top:1px solid var(--border); font-size:.86rem; line-height:1.4; color:var(--text);}
+  #hoyCard .hoyRow b{color:var(--primary-dark);}
+  #hoyCard .hoyRow small{display:block; color:var(--text-muted); font-size:.8rem;}
+  #hoyCard .hoyIco{flex:0 0 auto; width:22px; text-align:center;}
+  #hoyCard button.hoyLink{background:none; border:none; padding:0; font:inherit; font-weight:700; color:var(--primary-dark); cursor:pointer; text-align:left; text-decoration:underline;}
+  #hoyCard .hoyMas{display:none; padding:2px 0 8px 32px; font-size:.84rem; line-height:1.45; color:var(--text);}
+  #hoyCard .hoyMas.open{display:block;}
+  #hoyCard .hoyMas p{margin:0 0 8px;}
+  #hoyCard .hoyNota{font-size:.72rem; color:var(--text-muted); margin:6px 0 2px;}
+  .msgOffer{align-self:flex-start; margin:-4px 0 10px 4px; max-width:min(82%, calc(100% - 38px)); background:var(--surface-alt); border:1px dashed var(--border); border-radius:14px; padding:10px 12px; font-size:.86rem; line-height:1.4; color:var(--text);}
+  .msgOffer .offerBtns{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; align-items:center;}
+  .msgOffer button{border:none; border-radius:10px; padding:7px 12px; font-weight:700; font-size:.82rem; cursor:pointer;}
+  .msgOffer button.offerOk{background:var(--primary); color:#fff;}
+  .msgOffer button.offerNo{background:transparent; color:var(--text-muted);}
+  .msgOffer input[type=date]{font:inherit; font-size:.8rem; border:1px solid var(--border); border-radius:8px; padding:4px 6px; background:var(--surface);}
+  .msgOffer .offerErr{color:var(--danger-text); font-size:.8rem; margin-top:6px;}
+
   #termsOverlay{
     position:fixed; inset:0; background:rgba(14,23,22,.55); z-index:100;
     display:flex; align-items:center; justify-content:center; padding:18px;
@@ -1511,6 +1532,13 @@
   });
 
   async function ask(userText, files){
+    // Punto 3: sin sesión y sin aceptación previa, se pide aquí (antes de
+    // enviar nada al servidor) y la pregunta queda en espera.
+    if (termsLazy && !localTermsAccepted()) {
+      termsPending = { text: userText, files: files || [] };
+      showTermsGate("primer_mensaje");
+      return;
+    }
     hideStage();
     files = files || [];
     var displayText = userText || (files.length > 1
@@ -1696,6 +1724,7 @@
         }
         turns.push({ role: "assistant", content: accumulated });
         saveHistory();
+        ofrecerAccionesDesdeChat(displayText, botEl);
         if (cortoSinTerminar) {
           // Hubo texto pero la transmisión se cortó antes del evento final
           // (ej. se perdió la conexión a mitad de camino) — se avisa aparte,
@@ -1985,7 +2014,22 @@
   function setLocalTermsAccepted(){
     try { localStorage.setItem("bm_terms_accepted_" + TERMS_VERSION, "1"); } catch (e) {}
   }
-  function showTermsGate(){ termsOverlay.classList.remove("hidden"); }
+  // Punto 3 (10 nov 2026): quien llega SIN sesión ve primero el chat; la
+  // aceptación se pide justo antes de enviar su primera pregunta (termsLazy).
+  // Quien ya inició sesión y no ha aceptado sigue viendo el aviso al cargar,
+  // porque desde ahí puede guardar datos del bebé. El texto legal y la
+  // TERMS_VERSION no cambian: nadie tiene que aceptar de nuevo.
+  var termsLazy = false, termsPending = null, termsMomento = "carga";
+  function bmTrack(nombre, params){
+    try { if (typeof gtag === "function") gtag("event", nombre, params || {}); } catch (e) {}
+  }
+  function showTermsGate(momento){
+    termsMomento = momento || "carga";
+    var tt = document.getElementById("termsModalTitle");
+    if (tt) tt.textContent = (termsMomento === "primer_mensaje") ? "Antes de enviar tu pregunta" : "Antes de empezar";
+    termsOverlay.classList.remove("hidden");
+    bmTrack("terminos_mostrados", { momento: termsMomento });
+  }
   function hideTermsGate(){ termsOverlay.classList.add("hidden"); }
 
   termsCheckbox.addEventListener("change", function(){
@@ -1994,10 +2038,166 @@
   termsAcceptBtn.addEventListener("click", async function(){
     setLocalTermsAccepted();
     hideTermsGate();
+    bmTrack("terminos_aceptados", { momento: termsMomento });
+    termsLazy = false;
+    var pendiente = termsPending;
+    termsPending = null;
+    if (pendiente) { ask(pendiente.text, pendiente.files); }
     try {
       await fetch("/api/accept-terms", { method: "POST" });
     } catch (e) { /* si falla, la evidencia local ya quedó guardada */ }
   });
+
+  // --- Punto 6: del chat a la Agenda y a las curvas de crecimiento -------
+  // Si quien escribe (con sesión) menciona el peso/talla de su bebé o una
+  // cita con fecha, bajo la respuesta aparece una oferta para guardarlo.
+  // Nada se guarda sin que la persona lo confirme con un toque.
+  var __bebeCache = null;
+  async function obtenerBebe(){
+    if (__bebeCache) return __bebeCache;
+    try {
+      var r = await fetch("/api/bebe");
+      if (!r.ok) return false;
+      var d = await r.json();
+      if (d && d.bebe) { __bebeCache = d.bebe; return __bebeCache; }
+    } catch (e) {}
+    return false;
+  }
+  function hoyBogota(){
+    try { return new Date().toLocaleDateString("en-CA", { timeZone: "America/Bogota" }); }
+    catch (e) { return new Date().toISOString().slice(0, 10); }
+  }
+  function detectarMedidas(txt){
+    var t = (txt || "").toLowerCase();
+    if (!/(^|[^a-záéíóúñ])(pes[oó]|pesa|pesamos|pesaron|mide|midi[oó]|midieron|talla)(?![a-záéíóúñ])/.test(t)) return null;
+    var out = {};
+    var mk = t.match(/(\d{1,2}(?:[.,]\d{1,3})?)\s*(?:kg|kgs|kilos?|kilogramos?)\b/);
+    var mg = t.match(/(\d{3,5})\s*(?:g|gr|grs|gramos)\b/);
+    var mc = t.match(/(\d{2,3}(?:[.,]\d)?)\s*(?:cm|cms|centimetros|centímetros)/);
+    if (mk) {
+      var g = Math.round(parseFloat(mk[1].replace(",", ".")) * 1000);
+      if (g >= 500 && g <= 25000) out.peso_g = g;
+    } else if (mg) {
+      var g2 = parseInt(mg[1], 10);
+      if (g2 >= 500 && g2 <= 25000) out.peso_g = g2;
+    }
+    if (mc) {
+      var mm = Math.round(parseFloat(mc[1].replace(",", ".")) * 10);
+      if (mm >= 300 && mm <= 1100) out.talla_mm = mm;
+    }
+    return (out.peso_g || out.talla_mm) ? out : null;
+  }
+  function detectarCita(txt){
+    var t = (txt || "").toLowerCase();
+    if (!/\b(cita|control|consulta|vacunas?|vacunaci[oó]n|ex[aá]menes|examen|ecograf[ií]a)\b/.test(t)) return false;
+    if (!/(ma[ñn]ana|lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bado|domingo|pr[oó]xima semana|pr[oó]ximo mes|el \d{1,2} de [a-záéíóúñ]+|\d{1,2}\/\d{1,2}|dentro de \d+ (d[ií]as|semanas))/.test(t)) return false;
+    if (!/(tengo|tenemos|nos toca|le toca|me toca|nos dieron|me dieron|agend|program|asign|pidieron|sacamos)/.test(t)) return false;
+    return true;
+  }
+  function fmtMedidas(m){
+    var partes = [];
+    if (m.peso_g) partes.push("peso " + (m.peso_g / 1000).toString().replace(".", ",") + " kg");
+    if (m.talla_mm) partes.push("talla " + (m.talla_mm / 10).toString().replace(".", ",") + " cm");
+    return partes.join(" · ");
+  }
+  function crearOferta(){
+    var c = document.createElement("div");
+    c.className = "msgOffer";
+    return c;
+  }
+  function ofertaSinPerfil(tipo, texto){
+    var c = crearOferta();
+    var p = document.createElement("div");
+    p.textContent = texto;
+    var b = document.createElement("div"); b.className = "offerBtns";
+    var ok = document.createElement("button"); ok.type = "button"; ok.className = "offerOk"; ok.textContent = "Crear perfil del bebé";
+    ok.addEventListener("click", function(){ bmTrack("oferta_chat_aceptada", { tipo: tipo + "_sin_perfil" }); openBebeModal(); });
+    var no = document.createElement("button"); no.type = "button"; no.className = "offerNo"; no.textContent = "No, gracias";
+    no.addEventListener("click", function(){ c.remove(); });
+    b.appendChild(ok); b.appendChild(no); c.appendChild(p); c.appendChild(b);
+    return c;
+  }
+  function ofertaMedidas(medidas, bebe){
+    var nombre = (bebe && bebe.nombre) ? bebe.nombre : "tu bebé";
+    if (!bebe) return ofertaSinPerfil("medidas", "¿Quieres guardar esa medición en las curvas de crecimiento? Primero necesitas crear el perfil del bebé.");
+    if (bebe.etapa !== "nacido") return null;
+    var c = crearOferta();
+    var p = document.createElement("div");
+    p.textContent = "📏 ¿Guardo en las curvas de crecimiento de " + nombre + ": " + fmtMedidas(medidas) + "?";
+    var b = document.createElement("div"); b.className = "offerBtns";
+    var fecha = document.createElement("input"); fecha.type = "date"; fecha.value = hoyBogota(); fecha.max = hoyBogota();
+    fecha.setAttribute("aria-label", "Fecha de la medición");
+    var ok = document.createElement("button"); ok.type = "button"; ok.className = "offerOk"; ok.textContent = "Guardar";
+    var no = document.createElement("button"); no.type = "button"; no.className = "offerNo"; no.textContent = "No, gracias";
+    var err = document.createElement("div"); err.className = "offerErr"; err.style.display = "none";
+    no.addEventListener("click", function(){ c.remove(); });
+    ok.addEventListener("click", async function(){
+      ok.disabled = true; err.style.display = "none";
+      try {
+        var r = await fetch("/api/bebe/crecimiento", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ fecha: fecha.value, peso_g: medidas.peso_g || null, talla_mm: medidas.talla_mm || null })
+        });
+        if (r.ok) {
+          bmTrack("oferta_chat_aceptada", { tipo: "medidas" });
+          c.innerHTML = "";
+          var t = document.createElement("div"); t.textContent = "✅ Guardado. Ya aparece en las curvas de crecimiento de " + nombre + ".";
+          var bb = document.createElement("div"); bb.className = "offerBtns";
+          var ver = document.createElement("button"); ver.type = "button"; ver.className = "offerOk"; ver.textContent = "Ver curvas";
+          ver.addEventListener("click", function(){ openBebeModal(); });
+          bb.appendChild(ver); c.appendChild(t); c.appendChild(bb);
+          return;
+        }
+        var d = {}; try { d = await r.json(); } catch (e2) {}
+        var msg = "No se pudo guardar. Inténtalo desde Perfil del bebé → Crecimiento.";
+        if (d.error === "fuera_de_rango") msg = "Ese valor parece fuera de rango; revísalo en Perfil del bebé → Crecimiento.";
+        else if (d.error === "fecha_anterior_al_nacimiento") msg = "La fecha es anterior al nacimiento del bebé.";
+        else if (d.error === "bebe_no_nacido") msg = "El perfil aún está en embarazo; las curvas se activan al nacer.";
+        err.textContent = msg; err.style.display = "";
+      } catch (e) {
+        err.textContent = "No se pudo guardar por la conexión. Inténtalo de nuevo."; err.style.display = "";
+      }
+      ok.disabled = false;
+    });
+    b.appendChild(fecha); b.appendChild(ok); b.appendChild(no);
+    c.appendChild(p); c.appendChild(b); c.appendChild(err);
+    return c;
+  }
+  function ofertaCita(bebe){
+    if (!bebe) return ofertaSinPerfil("cita", "¿Quieres guardar esa cita en la Agenda con recordatorio? Primero necesitas crear el perfil del bebé.");
+    var c = crearOferta();
+    var p = document.createElement("div");
+    p.textContent = "📅 ¿Quieres guardar esa cita en la Agenda y recibir un recordatorio?";
+    var b = document.createElement("div"); b.className = "offerBtns";
+    var ok = document.createElement("button"); ok.type = "button"; ok.className = "offerOk"; ok.textContent = "Abrir Agenda";
+    ok.addEventListener("click", function(){ bmTrack("oferta_chat_aceptada", { tipo: "cita" }); openAgendaModal(); });
+    var no = document.createElement("button"); no.type = "button"; no.className = "offerNo"; no.textContent = "No, gracias";
+    no.addEventListener("click", function(){ c.remove(); });
+    b.appendChild(ok); b.appendChild(no); c.appendChild(p); c.appendChild(b);
+    return c;
+  }
+  async function ofrecerAccionesDesdeChat(texto, botEl){
+    try {
+      if (!loggedIn || !botEl) return;
+      var medidas = detectarMedidas(texto);
+      var hayCita = detectarCita(texto);
+      if (!medidas && !hayCita) return;
+      var bebe = await obtenerBebe();
+      var fila = botEl.parentNode;
+      if (!fila || !fila.parentNode) return;
+      var ref = fila;
+      var tarjetas = [];
+      if (medidas) tarjetas.push({ tipo: "medidas", el: ofertaMedidas(medidas, bebe) });
+      if (hayCita) tarjetas.push({ tipo: "cita", el: ofertaCita(bebe) });
+      tarjetas.forEach(function(t){
+        if (!t.el) return;
+        ref.parentNode.insertBefore(t.el, ref.nextSibling);
+        ref = t.el;
+        bmTrack("oferta_chat_mostrada", { tipo: t.tipo });
+      });
+      scrollToBottom();
+    } catch (e) { /* las ofertas son opcionales: nunca deben romper el chat */ }
+  }
 
   // --- Perfil del bebé + Agenda de citas ------------------------------
   // Ambas funciones requieren sesión iniciada porque el perfil se comparte
@@ -3655,6 +3855,149 @@
   sonidosCloseBtn.addEventListener("click", function(){ sonidosOverlay.classList.add("hidden"); sonidosActualizarMiniBar(); });
   sonidosOverlay.addEventListener("click", function(ev){ if (ev.target === sonidosOverlay) { sonidosOverlay.classList.add("hidden"); sonidosActualizarMiniBar(); } });
 
+  // --- Punto 7: tarjeta "Hoy con [bebé]" en la pantalla de inicio --------
+  // Solo para quien inició sesión. El contenido del mes viene del backend
+  // (/api/hoy) y es el mismo del correo de cumplemés, respaldado por las bases
+  // de conocimiento; aquí nada se calcula ni se inventa.
+  function hoyFila(ico, nodo){
+    var f = document.createElement("div"); f.className = "hoyRow";
+    var i = document.createElement("span"); i.className = "hoyIco"; i.textContent = ico;
+    var c = document.createElement("div"); c.style.flex = "1"; c.appendChild(nodo);
+    f.appendChild(i); f.appendChild(c);
+    return f;
+  }
+  function hoyTexto(html){
+    var d = document.createElement("div"); d.textContent = html; return d;
+  }
+  function hoyLink(texto, fn){
+    var b = document.createElement("button"); b.type = "button"; b.className = "hoyLink"; b.textContent = texto;
+    b.addEventListener("click", fn); return b;
+  }
+  function fraseDias(n){
+    if (n === 0) return "hoy";
+    if (n === 1) return "mañana";
+    return "en " + n + " días";
+  }
+  function personalizarChips(nombre, etapa, semana){
+    if (!chips) return;
+    var qs = [];
+    if (etapa === "nacido") {
+      qs = [
+        "¿Qué es esperable en el desarrollo de " + nombre + " este mes?",
+        "¿Cómo debería ser el sueño de " + nombre + " a esta edad?",
+        "¿Cómo debería ser la alimentación de " + nombre + " a esta edad?",
+        "¿Qué señales de alarma debo vigilar a esta edad?"
+      ];
+    } else if (etapa === "gestacion" && semana) {
+      qs = [
+        "¿Qué cambios son normales en la semana " + semana + " de embarazo?",
+        "¿Qué señales de alarma debo vigilar en mi embarazo?",
+        "¿Cómo me preparo para el parto?"
+      ];
+    }
+    if (!qs.length) return;
+    chips.innerHTML = "";
+    qs.forEach(function(q){
+      var b = document.createElement("button");
+      b.className = "chip"; b.type = "button";
+      b.setAttribute("data-q", q);
+      b.textContent = "\u201C" + q + "\u201D";
+      chips.appendChild(b);
+    });
+  }
+  async function cargarHoyCard(){
+    if (!loggedIn || !stage || !stage.parentNode) return;
+    var data;
+    try {
+      var r = await fetch("/api/hoy");
+      if (!r.ok) return;
+      data = await r.json();
+    } catch (e) { return; }
+    if (!stage.parentNode) return; // ya empezó la conversación
+    var card = document.createElement("div");
+    card.id = "hoyCard";
+
+    if (!data.bebe) {
+      var h0 = document.createElement("h3"); h0.textContent = "Personaliza Baby Mathew para tu bebé";
+      var p0 = document.createElement("div"); p0.className = "hoyEdad";
+      p0.textContent = "Con su perfil, las respuestas se ajustan a su edad y puedes guardar citas, medicamentos y curvas de crecimiento.";
+      card.appendChild(h0); card.appendChild(p0);
+      card.appendChild(hoyFila("👶", hoyLink("Crear el perfil del bebé", function(){ bmTrack("hoy_card_click", { accion: "crear_perfil" }); openBebeModal(); })));
+    } else {
+      var b = data.bebe;
+      var nombre = b.nombre || "tu bebé";
+      var h = document.createElement("h3"); h.textContent = "Hoy con " + nombre;
+      card.appendChild(h);
+      if (b.edad_texto) {
+        var e = document.createElement("div"); e.className = "hoyEdad"; e.textContent = b.edad_texto;
+        card.appendChild(e);
+      }
+      if (b.contenido) {
+        var ct = b.contenido;
+        var bloque = document.createElement("div");
+        var t1 = document.createElement("div");
+        var s1 = document.createElement("b"); s1.textContent = "Este mes: ";
+        t1.appendChild(s1); t1.appendChild(document.createTextNode(ct.hab1.titulo + " · " + ct.hab2.titulo));
+        var sm = document.createElement("small"); sm.textContent = ct.hab1.desc;
+        bloque.appendChild(t1); bloque.appendChild(sm);
+        var mas = document.createElement("div"); mas.className = "hoyMas";
+        var pe = document.createElement("p"); pe.textContent = ct.esperar;
+        var ps = document.createElement("p"); ps.textContent = "Sueño: " + ct.sueno;
+        mas.appendChild(pe); mas.appendChild(ps);
+        var ver = hoyLink("Ver qué esperar este mes", function(){
+          var abierto = mas.classList.toggle("open");
+          ver.textContent = abierto ? "Ocultar" : "Ver qué esperar este mes";
+          if (abierto) bmTrack("hoy_card_click", { accion: "ver_mes" });
+        });
+        var vw = document.createElement("div"); vw.style.marginTop = "4px"; vw.appendChild(ver);
+        bloque.appendChild(vw);
+        card.appendChild(hoyFila("🌱", bloque));
+        card.appendChild(mas);
+      }
+      var cita = b.proxima_cita;
+      if (cita) {
+        var tc = document.createElement("div");
+        var sc = document.createElement("b"); sc.textContent = "Próxima cita: ";
+        tc.appendChild(sc);
+        tc.appendChild(document.createTextNode(cita.especialidad + " · " + fmtFecha(cita.fecha) + (cita.hora ? " " + cita.hora : "")
+          + (typeof cita.dias === "number" ? " (" + fraseDias(cita.dias) + ")" : "")));
+        var lk = document.createElement("div"); lk.style.marginTop = "4px";
+        lk.appendChild(hoyLink("Ver agenda", function(){ bmTrack("hoy_card_click", { accion: "ver_agenda" }); openAgendaModal(); }));
+        tc.appendChild(lk);
+        card.appendChild(hoyFila("📅", tc));
+      } else {
+        card.appendChild(hoyFila("📅", hoyLink("Sin citas próximas · Agendar una", function(){ bmTrack("hoy_card_click", { accion: "agendar" }); openAgendaModal(); })));
+      }
+      if (b.etapa === "nacido") {
+        var um = b.ultima_medicion;
+        if (um) {
+          var partes = [];
+          if (um.peso_g) partes.push((um.peso_g / 1000).toString().replace(".", ",") + " kg");
+          if (um.talla_mm) partes.push((um.talla_mm / 10).toString().replace(".", ",") + " cm");
+          var tm = document.createElement("div");
+          var sm2 = document.createElement("b"); sm2.textContent = "Último control: ";
+          tm.appendChild(sm2); tm.appendChild(document.createTextNode(partes.join(" · ") + " (" + fmtFecha(um.fecha) + ")"));
+          var lm = document.createElement("div"); lm.style.marginTop = "4px";
+          lm.appendChild(hoyLink("Ver curvas", function(){ bmTrack("hoy_card_click", { accion: "ver_curvas" }); openBebeModal(); }));
+          tm.appendChild(lm);
+          card.appendChild(hoyFila("⚖️", tm));
+        } else {
+          card.appendChild(hoyFila("⚖️", hoyLink("Registrar peso y talla de " + nombre, function(){ bmTrack("hoy_card_click", { accion: "registrar_medicion" }); openBebeModal(); })));
+        }
+      }
+      if (b.contenido) {
+        var nota = document.createElement("div"); nota.className = "hoyNota";
+        nota.textContent = "Información general: cada bebé va a su propio ritmo. No reemplaza el control con tu pediatra.";
+        card.appendChild(nota);
+      }
+      personalizarChips(nombre, b.etapa, b.semana);
+    }
+    // Con perfil, el párrafo genérico de bienvenida sobra encima de la tarjeta.
+    if (data.bebe) { var introP = stage.querySelector("p"); if (introP) introP.style.display = "none"; }
+    stage.insertBefore(card, chips);
+    bmTrack("hoy_card_vista", { con_perfil: data.bebe ? "si" : "no" });
+  }
+
   (async function init(){
     var me = { logged_in: false };
     try {
@@ -3668,12 +4011,14 @@
     // para anónimos, solo tenemos el navegador actual.
     var alreadyAccepted = me.logged_in ? !!me.terms_accepted : localTermsAccepted();
     if (!alreadyAccepted) {
-      showTermsGate();
+      if (me.logged_in) { showTermsGate("carga"); }
+      else { termsLazy = true; }
     } else if (me.logged_in) {
       setLocalTermsAccepted(); // evita mostrarla de nuevo si luego cierra sesión en este mismo navegador
     }
 
     if (loggedIn) {
+      cargarHoyCard();
       try {
         var histRes = await fetch("/api/history");
         if (histRes.ok) {
