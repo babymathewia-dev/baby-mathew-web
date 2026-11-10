@@ -399,6 +399,8 @@
   #hoyCard .hoyMas{display:none; padding:2px 0 8px 32px; font-size:.84rem; line-height:1.45; color:var(--text);}
   #hoyCard .hoyMas.open{display:block;}
   #hoyCard .hoyMas p{margin:0 0 8px;}
+  #hoyCard.hoyEnChat{position:relative; align-self:stretch; margin:14px 2px 6px;}
+  #hoyCard .hoyCerrar{position:absolute; top:6px; right:8px; border:none; background:transparent; font-size:1.4rem; line-height:1; color:var(--text-muted); cursor:pointer; padding:4px 8px;}
   #hoyCard .hoyNota{font-size:.72rem; color:var(--text-muted); margin:6px 0 2px;}
   .msgOffer{align-self:flex-start; margin:-4px 0 10px 4px; max-width:min(82%, calc(100% - 38px)); background:var(--surface-alt); border:1px dashed var(--border); border-radius:14px; padding:10px 12px; font-size:.86rem; line-height:1.4; color:var(--text);}
   .msgOffer .offerBtns{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; align-items:center;}
@@ -1539,6 +1541,9 @@
       showTermsGate("primer_mensaje");
       return;
     }
+    preguntaEnSesion = true;
+    var hcViejo = document.getElementById("hoyCard");
+    if (hcViejo && hcViejo.parentNode) hcViejo.parentNode.removeChild(hcViejo);
     hideStage();
     files = files || [];
     var displayText = userText || (files.length > 1
@@ -2053,6 +2058,7 @@
   // cita con fecha, bajo la respuesta aparece una oferta para guardarlo.
   // Nada se guarda sin que la persona lo confirme con un toque.
   var __bebeCache = null;
+  var preguntaEnSesion = false;
   async function obtenerBebe(){
     if (__bebeCache) return __bebeCache;
     try {
@@ -3906,16 +3912,18 @@
     });
   }
   async function cargarHoyCard(){
-    if (!loggedIn || !stage || !stage.parentNode) return;
+    if (!loggedIn || !stage || preguntaEnSesion) return;
     var data;
     try {
       var r = await fetch("/api/hoy");
       if (!r.ok) return;
       data = await r.json();
     } catch (e) { return; }
-    if (!stage.parentNode) return; // ya empezó la conversación
+    if (preguntaEnSesion) return; // ya empezó una conversación nueva
+    var enChat = !stage.parentNode; // se restauró el último chat: la tarjeta va al final
     var card = document.createElement("div");
     card.id = "hoyCard";
+    if (enChat) card.className = "hoyEnChat";
 
     if (!data.bebe) {
       var h0 = document.createElement("h3"); h0.textContent = "Personaliza Baby Mathew para tu bebé";
@@ -3990,11 +3998,20 @@
         nota.textContent = "Información general: cada bebé va a su propio ritmo. No reemplaza el control con tu pediatra.";
         card.appendChild(nota);
       }
-      personalizarChips(nombre, b.etapa, b.semana);
+      if (!enChat) personalizarChips(nombre, b.etapa, b.semana);
     }
-    // Con perfil, el párrafo genérico de bienvenida sobra encima de la tarjeta.
-    if (data.bebe) { var introP = stage.querySelector("p"); if (introP) introP.style.display = "none"; }
-    stage.insertBefore(card, chips);
+    if (enChat) {
+      var x = document.createElement("button");
+      x.type = "button"; x.className = "hoyCerrar"; x.setAttribute("aria-label", "Cerrar"); x.textContent = "\u00D7";
+      x.addEventListener("click", function(){ card.remove(); });
+      card.appendChild(x);
+      main.appendChild(card);
+      scrollToBottom();
+    } else {
+      // Con perfil, el párrafo genérico de bienvenida sobra encima de la tarjeta.
+      if (data.bebe) { var introP = stage.querySelector("p"); if (introP) introP.style.display = "none"; }
+      stage.insertBefore(card, chips);
+    }
     bmTrack("hoy_card_vista", { con_perfil: data.bebe ? "si" : "no" });
   }
 
@@ -4018,7 +4035,6 @@
     }
 
     if (loggedIn) {
-      cargarHoyCard();
       try {
         var histRes = await fetch("/api/history");
         if (histRes.ok) {
@@ -4040,6 +4056,9 @@
           }
         }
       } catch (e) { /* si falla, arranca sin historial previo */ }
+      // Después de restaurar el último chat: si hay historial, la tarjeta va al
+      // final de la conversación; si no, en la pantalla de inicio.
+      cargarHoyCard();
     } else {
       renderTurns(loadHistory());
     }
