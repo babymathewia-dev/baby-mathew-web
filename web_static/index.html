@@ -388,8 +388,8 @@
   }
   /* Modal de aceptación de Términos y Política de Datos (num. 2 y 16) */
   /* --- Tarjeta "Hoy con [bebé]" y ofertas dentro del chat --- */
-  #hoyCard{background:var(--surface-alt); border:1px solid var(--border); border-radius:16px; padding:14px 14px 10px; margin:0 0 16px; text-align:left;}
-  #hoyCard h3{margin:0; font-size:1.02rem; color:var(--primary-dark);}
+  #hoyCard{position:relative; background:var(--surface-alt); border:1px solid var(--border); border-radius:16px; padding:14px 14px 10px; margin:0 0 16px; text-align:left;}
+  #hoyCard h3{margin:0; padding-right:30px; font-size:1.02rem; color:var(--primary-dark);}
   #hoyCard .hoyEdad{font-size:.82rem; color:var(--text-muted); margin:2px 0 8px;}
   #hoyCard .hoyRow{display:flex; gap:10px; align-items:flex-start; padding:9px 0; border-top:1px solid var(--border); font-size:.86rem; line-height:1.4; color:var(--text);}
   #hoyCard .hoyRow b{color:var(--primary-dark);}
@@ -401,6 +401,12 @@
   #hoyCard .hoyMas p{margin:0 0 8px;}
   #hoyCard.hoyEnChat{position:relative; align-self:stretch; margin:14px 2px 6px;}
   #hoyCard .hoyCerrar{position:absolute; top:6px; right:8px; border:none; background:transparent; font-size:1.4rem; line-height:1; color:var(--text-muted); cursor:pointer; padding:4px 8px;}
+  #hoyCard .hoyHead{display:flex; gap:12px; align-items:center; padding-right:26px; margin-bottom:10px;}
+  #hoyCard .hoyFoto{flex:0 0 auto; width:60px; height:60px; border-radius:50%; overflow:hidden; display:flex; align-items:center; justify-content:center; color:#fff; font-size:1.3rem; font-weight:700; border:2px solid #fff; box-shadow:0 1px 4px rgba(0,0,0,.15);}
+  #hoyCard .hoyFoto img{width:100%; height:100%; object-fit:cover; display:block;}
+  #hoyCard .hoyHead h3{padding-right:0; line-height:1.25;}
+  #hoyCard .hoyHead .hoyEdad{margin:2px 0 0;}
+  #hoyCard .hoyMas .hoyParaUstedes{font-size:.76rem; color:var(--text-muted); margin:0 0 6px;}
   #hoyCard .hoyNota{font-size:.72rem; color:var(--text-muted); margin:6px 0 2px;}
   .msgOffer{align-self:flex-start; margin:-4px 0 10px 4px; max-width:min(82%, calc(100% - 38px)); background:var(--surface-alt); border:1px dashed var(--border); border-radius:14px; padding:10px 12px; font-size:.86rem; line-height:1.4; color:var(--text);}
   .msgOffer .offerBtns{display:flex; gap:8px; flex-wrap:wrap; margin-top:8px; align-items:center;}
@@ -3911,6 +3917,44 @@
       chips.appendChild(b);
     });
   }
+  // Al cerrar la tarjeta con la "x" no vuelve a salir hasta el próximo lunes
+  // (hora de Bogotá). Se guarda solo en este dispositivo; si el almacenamiento
+  // no está disponible, simplemente se muestra como siempre.
+  var HOY_SNOOZE_KEY = "bm_hoy_cerrada_hasta";
+  function proximoLunes(){
+    var f = hoyBogota();                       // YYYY-MM-DD en hora de Bogotá
+    var d = new Date(f + "T00:00:00Z");
+    var dow = d.getUTCDay();                   // 0 = domingo ... 1 = lunes
+    var dias = (8 - dow) % 7; if (dias === 0) dias = 7;
+    d.setUTCDate(d.getUTCDate() + dias);
+    return d.toISOString().slice(0, 10);
+  }
+  function hoyPospuesta(){
+    try {
+      var hasta = localStorage.getItem(HOY_SNOOZE_KEY);
+      return !!(hasta && hoyBogota() < hasta);
+    } catch (e) { return false; }
+  }
+  function posponerHoyCard(){
+    try { localStorage.setItem(HOY_SNOOZE_KEY, proximoLunes()); } catch (e) {}
+  }
+  // Contenido por trimestre de gestación, tomado de kb_gestacion.md (la base no
+  // trae detalle semana a semana, así que no se inventan datos por semana).
+  var HOY_GESTACION = {
+    1: { etapa: "primer trimestre, semanas 1 a 13",
+      esperar: "Es normal que mamá sienta náuseas y vómitos (a cualquier hora del día), cansancio intenso, sensibilidad en los senos, cambios de ánimo y más ganas de ir al baño. Las náuseas suelen mejorar hacia la semana 12-14.",
+      orientar: "Ayudan las comidas pequeñas y frecuentes, no quedarse con el estómago vacío, tomar líquidos en sorbos y confirmar el ácido fólico y los controles prenatales.",
+      consultar: "Si las náuseas no dejan retener líquidos por más de 24 horas, consulten con su médico." },
+    2: { etapa: "segundo trimestre, semanas 14 a 27",
+      esperar: "Suelen bajar las náuseas y subir un poco la energía. Entre las semanas 18 y 22 en un primer embarazo (antes si no es el primero) mamá puede empezar a sentir mis movimientos. También son frecuentes las punzadas en la ingle al cambiar de posición, los calambres en las piernas de noche, los cambios en la piel y las encías sensibles.",
+      orientar: "Es buen momento para la ecografía morfológica, los controles de rutina y preguntar por el curso de preparación para el parto.",
+      consultar: "Dolor pélvico intenso y persistente, o dejar de sentir mis movimientos cuando ya eran regulares: avisen de inmediato a su médico o acudan a urgencias." },
+    3: { etapa: "tercer trimestre, semanas 28 a 40",
+      esperar: "Es común que mamá duerma peor, sienta un poco de falta de aire, tenga los pies hinchados al final del día, dolor de espalda baja y más ganas de orinar. Pueden aparecer contracciones de Braxton-Hicks: irregulares, que no aumentan y ceden con reposo o agua.",
+      orientar: "Desde la semana 36 conviene tener lista la maleta del parto y los documentos (carné prenatal, EPS, identificación).",
+      consultar: "Contracciones regulares que van aumentando, sangrado o ruptura de la bolsa: acudan a la institución de salud." }
+  };
+  function trimestreDe(semana){ return semana <= 13 ? 1 : (semana <= 27 ? 2 : 3); }
   async function cargarHoyCard(){
     if (!loggedIn || !stage || preguntaEnSesion) return;
     var data;
@@ -3921,6 +3965,12 @@
     } catch (e) { return; }
     if (preguntaEnSesion) return; // ya empezó una conversación nueva
     var enChat = !stage.parentNode; // se restauró el último chat: la tarjeta va al final
+    if (hoyPospuesta()) {
+      // Cerrada esta semana: no se muestra la tarjeta, pero las preguntas de
+      // ejemplo siguen personalizadas en una conversación nueva.
+      if (data.bebe && !enChat) personalizarChips(data.bebe.nombre || "tu bebé", data.bebe.etapa, data.bebe.semana);
+      return;
+    }
     var card = document.createElement("div");
     card.id = "hoyCard";
     if (enChat) card.className = "hoyEnChat";
@@ -3934,27 +3984,52 @@
     } else {
       var b = data.bebe;
       var nombre = b.nombre || "tu bebé";
-      var h = document.createElement("h3"); h.textContent = "Hoy con " + nombre;
-      card.appendChild(h);
-      if (b.edad_texto) {
-        var e = document.createElement("div"); e.className = "hoyEdad"; e.textContent = b.edad_texto;
-        card.appendChild(e);
+      var primerNombre = (b.nombre || "").trim().split(/\s+/)[0] || "";
+      // La foto vive en /api/bebe (la misma del perfil); si falla o no hay, inicial.
+      var perfil = null;
+      try { perfil = await obtenerBebe(); } catch (e) { perfil = null; }
+      if (preguntaEnSesion) return;
+      var foto = document.createElement("div"); foto.className = "hoyFoto";
+      if (perfil && perfil.foto) {
+        var im = document.createElement("img"); im.src = perfil.foto; im.alt = "";
+        im.addEventListener("error", function(){ foto.innerHTML = ""; foto.style.background = avatarColorFor(nombre); foto.textContent = (b.nombre ? primeraInicial(b.nombre) : "") || "👶"; });
+        foto.style.background = "var(--surface-alt)"; foto.appendChild(im);
+      } else {
+        foto.style.background = avatarColorFor(nombre);
+        foto.textContent = (b.nombre ? primeraInicial(b.nombre) : "") || "👶";
       }
+      var tit = document.createElement("div");
+      var h = document.createElement("h3");
+      var e = document.createElement("div"); e.className = "hoyEdad";
+      if (b.etapa === "gestacion") {
+        h.textContent = primerNombre ? "¡Hola, papás! Soy " + primerNombre + " 💙"
+          : (b.semana ? "¡Hola, papás! Ya voy en la semana " + b.semana + " 💙" : "¡Hola, papás! Ya voy en camino 💙");
+        e.textContent = (primerNombre && b.semana ? "Ya voy en la semana " + b.semana + " · " : "") + "Todavía estoy en la pancita";
+      } else {
+        h.textContent = "¡Hola, papás! Soy " + (primerNombre || "su bebé") + " 👋";
+        if (b.edad_texto) e.textContent = "Hoy tengo " + b.edad_texto;
+      }
+      tit.appendChild(h);
+      if (e.textContent) tit.appendChild(e);
+      var cab = document.createElement("div"); cab.className = "hoyHead";
+      cab.appendChild(foto); cab.appendChild(tit);
+      card.appendChild(cab);
       if (b.contenido) {
         var ct = b.contenido;
         var bloque = document.createElement("div");
         var t1 = document.createElement("div");
-        var s1 = document.createElement("b"); s1.textContent = "Este mes: ";
-        t1.appendChild(s1); t1.appendChild(document.createTextNode(ct.hab1.titulo + " · " + ct.hab2.titulo));
-        var sm = document.createElement("small"); sm.textContent = ct.hab1.desc;
-        bloque.appendChild(t1); bloque.appendChild(sm);
+        var s1 = document.createElement("b"); s1.textContent = "Este mes estoy aprendiendo: ";
+        t1.appendChild(s1); t1.appendChild(document.createTextNode(ct.hab1.titulo.toLowerCase() + " · " + ct.hab2.titulo.toLowerCase()));
+        bloque.appendChild(t1);
         var mas = document.createElement("div"); mas.className = "hoyMas";
+        var pu = document.createElement("p"); pu.className = "hoyParaUstedes"; pu.textContent = "Para ustedes, papás, según la guía de Baby Mathew:";
         var pe = document.createElement("p"); pe.textContent = ct.esperar;
         var ps = document.createElement("p"); ps.textContent = "Sueño: " + ct.sueno;
-        mas.appendChild(pe); mas.appendChild(ps);
-        var ver = hoyLink("Ver qué esperar este mes", function(){
+        mas.appendChild(pu); mas.appendChild(pe); mas.appendChild(ps);
+        var VER_TXT = "Papás, ¿qué pueden esperar de mí este mes?";
+        var ver = hoyLink(VER_TXT, function(){
           var abierto = mas.classList.toggle("open");
-          ver.textContent = abierto ? "Ocultar" : "Ver qué esperar este mes";
+          ver.textContent = abierto ? "Ocultar" : VER_TXT;
           if (abierto) bmTrack("hoy_card_click", { accion: "ver_mes" });
         });
         var vw = document.createElement("div"); vw.style.marginTop = "4px"; vw.appendChild(ver);
@@ -3965,7 +4040,7 @@
       var cita = b.proxima_cita;
       if (cita) {
         var tc = document.createElement("div");
-        var sc = document.createElement("b"); sc.textContent = "Próxima cita: ";
+        var sc = document.createElement("b"); sc.textContent = "Mi próxima cita: ";
         tc.appendChild(sc);
         tc.appendChild(document.createTextNode(cita.especialidad + " · " + fmtFecha(cita.fecha) + (cita.hora ? " " + cita.hora : "")
           + (typeof cita.dias === "number" ? " (" + fraseDias(cita.dias) + ")" : "")));
@@ -3983,33 +4058,81 @@
           if (um.peso_g) partes.push((um.peso_g / 1000).toString().replace(".", ",") + " kg");
           if (um.talla_mm) partes.push((um.talla_mm / 10).toString().replace(".", ",") + " cm");
           var tm = document.createElement("div");
-          var sm2 = document.createElement("b"); sm2.textContent = "Último control: ";
+          var sm2 = document.createElement("b"); sm2.textContent = "Así voy creciendo: ";
           tm.appendChild(sm2); tm.appendChild(document.createTextNode(partes.join(" · ") + " (" + fmtFecha(um.fecha) + ")"));
           var lm = document.createElement("div"); lm.style.marginTop = "4px";
-          lm.appendChild(hoyLink("Ver curvas", function(){ bmTrack("hoy_card_click", { accion: "ver_curvas" }); openBebeModal(); }));
+          lm.appendChild(hoyLink("Ver mis curvas", function(){ bmTrack("hoy_card_click", { accion: "ver_curvas" }); openBebeModal(); }));
           tm.appendChild(lm);
           card.appendChild(hoyFila("⚖️", tm));
         } else {
-          card.appendChild(hoyFila("⚖️", hoyLink("Registrar peso y talla de " + nombre, function(){ bmTrack("hoy_card_click", { accion: "registrar_medicion" }); openBebeModal(); })));
+          card.appendChild(hoyFila("⚖️", hoyLink("Registrar mi peso y talla", function(){ bmTrack("hoy_card_click", { accion: "registrar_medicion" }); openBebeModal(); })));
         }
       }
-      if (b.contenido) {
+      if (b.etapa === "gestacion" && b.semana) {
+        var gt = HOY_GESTACION[trimestreDe(b.semana)];
+        var gb = document.createElement("div");
+        var g1 = document.createElement("div");
+        var g1b = document.createElement("b"); g1b.textContent = "Esta semana estoy en el " + gt.etapa.split(",")[0] + ".";
+        g1.appendChild(g1b);
+        gb.appendChild(g1);
+        var gmas = document.createElement("div"); gmas.className = "hoyMas";
+        var gpu = document.createElement("p"); gpu.className = "hoyParaUstedes";
+        gpu.textContent = "Para ustedes, papás, según la guía de Baby Mathew (" + gt.etapa + "). Cada embarazo es distinto; para el detalle de la semana " + b.semana + ", pregúntenle a Baby Mathew.";
+        var gp1 = document.createElement("p"); gp1.textContent = gt.esperar;
+        var gp2 = document.createElement("p"); gp2.textContent = gt.orientar;
+        var gp3 = document.createElement("p"); gp3.textContent = "Cuándo consultar: " + gt.consultar;
+        gmas.appendChild(gpu); gmas.appendChild(gp1); gmas.appendChild(gp2); gmas.appendChild(gp3);
+        var GV = "Papás, ¿qué pueden esperar de mí esta semana?";
+        var gver = hoyLink(GV, function(){
+          var ab = gmas.classList.toggle("open");
+          gver.textContent = ab ? "Ocultar" : GV;
+          if (ab) bmTrack("hoy_card_click", { accion: "ver_semana" });
+        });
+        var gvw = document.createElement("div"); gvw.style.marginTop = "4px"; gvw.appendChild(gver);
+        gb.appendChild(gvw);
+        card.appendChild(hoyFila("🌱", gb));
+        card.appendChild(gmas);
+      }
+      if (b.etapa === "gestacion") {
+        var pq = b.semana ? "¿Qué cambios son normales en la semana " + b.semana + " de embarazo?" : "¿Qué cambios son normales en mi embarazo?";
+        var tg = document.createElement("div");
+        var sg = document.createElement("b"); sg.textContent = "¿Qué quieren saber de mí esta semana?";
+        tg.appendChild(sg);
+        var lg = document.createElement("div"); lg.style.marginTop = "4px";
+        lg.appendChild(hoyLink("Preguntarle a Baby Mathew", function(){
+          bmTrack("hoy_card_click", { accion: "preguntar_gestacion" });
+          var inp = document.getElementById("input");
+          if (inp) { inp.value = pq; inp.dispatchEvent(new Event("input", { bubbles: true })); inp.focus(); }
+        }));
+        tg.appendChild(lg);
+        card.appendChild(hoyFila("💬", tg));
+      }
+      if (b.contenido || b.etapa === "gestacion") {
         var nota = document.createElement("div"); nota.className = "hoyNota";
-        nota.textContent = "Información general: cada bebé va a su propio ritmo. No reemplaza el control con tu pediatra.";
+        nota.textContent = b.etapa === "gestacion"
+          ? "Información general: cada embarazo va a su propio ritmo. No reemplaza el control con tu médico."
+          : "Información general: cada bebé va a su propio ritmo. No reemplaza el control con tu pediatra.";
         card.appendChild(nota);
       }
       if (!enChat) personalizarChips(nombre, b.etapa, b.semana);
     }
+    var introP = null;
+    var x = document.createElement("button");
+    x.type = "button"; x.className = "hoyCerrar"; x.setAttribute("aria-label", "Cerrar hasta el próximo lunes");
+    x.title = "Cerrar hasta el próximo lunes"; x.textContent = "\u00D7";
+    x.addEventListener("click", function(){
+      posponerHoyCard();
+      bmTrack("hoy_card_cerrada", {});
+      card.remove();
+      if (introP) introP.style.display = "";
+    });
+    card.appendChild(x);
     if (enChat) {
-      var x = document.createElement("button");
-      x.type = "button"; x.className = "hoyCerrar"; x.setAttribute("aria-label", "Cerrar"); x.textContent = "\u00D7";
-      x.addEventListener("click", function(){ card.remove(); });
-      card.appendChild(x);
       main.appendChild(card);
       scrollToBottom();
     } else {
       // Con perfil, el párrafo genérico de bienvenida sobra encima de la tarjeta.
-      if (data.bebe) { var introP = stage.querySelector("p"); if (introP) introP.style.display = "none"; }
+      if (data.bebe) { introP = stage.querySelector("p"); if (introP) introP.style.display = "none"; }
       stage.insertBefore(card, chips);
     }
     bmTrack("hoy_card_vista", { con_perfil: data.bebe ? "si" : "no" });
