@@ -4049,7 +4049,15 @@
         tc.appendChild(lk);
         card.appendChild(hoyFila("📅", tc));
       } else {
-        card.appendChild(hoyFila("📅", hoyLink("Sin citas próximas · Agendar una", function(){ bmTrack("hoy_card_click", { accion: "agendar" }); openAgendaModal(); })));
+        var tv = document.createElement("div");
+        var sv = document.createElement("b"); sv.textContent = "Mi próxima cita: ";
+        tv.appendChild(sv);
+        tv.appendChild(document.createTextNode("¡Ups, todavía no tengo ninguna agendada! Para que no se nos olvide mi "
+          + (b.etapa === "gestacion" ? "próximo control prenatal" : "próxima revisión") + ", pasen por la agenda."));
+        var lv = document.createElement("div"); lv.style.marginTop = "4px";
+        lv.appendChild(hoyLink("Ir a la agenda", function(){ bmTrack("hoy_card_click", { accion: "agendar" }); openAgendaModal(); }));
+        tv.appendChild(lv);
+        card.appendChild(hoyFila("📅", tv));
       }
       if (b.etapa === "nacido") {
         var um = b.ultima_medicion;
@@ -4065,7 +4073,14 @@
           tm.appendChild(lm);
           card.appendChild(hoyFila("⚖️", tm));
         } else {
-          card.appendChild(hoyFila("⚖️", hoyLink("Registrar mi peso y talla", function(){ bmTrack("hoy_card_click", { accion: "registrar_medicion" }); openBebeModal(); })));
+          var tn = document.createElement("div");
+          var sn = document.createElement("b"); sn.textContent = "Así voy creciendo: ";
+          tn.appendChild(sn);
+          tn.appendChild(document.createTextNode("Aún no tengo registrado mi peso ni mi talla. Para que no nos perdamos nada de mi crecimiento, vayan a mis curvas."));
+          var ln = document.createElement("div"); ln.style.marginTop = "4px";
+          ln.appendChild(hoyLink("Ver mis curvas", function(){ bmTrack("hoy_card_click", { accion: "registrar_medicion" }); openBebeModal(); }));
+          tn.appendChild(ln);
+          card.appendChild(hoyFila("⚖️", tn));
         }
       }
       if (b.etapa === "gestacion" && b.semana) {
