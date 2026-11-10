@@ -178,13 +178,16 @@ MAX_HISTORY_TURNS = 12  # mensajes (usuario+bot) que se envían como contexto po
 # (2) al último mensaje del usuario se le agrega un recordatorio breve de las
 # reglas, que pesa más que el system prompt por estar pegado a la pregunta.
 # Nada de esto se guarda en el historial del usuario ni afecta la analítica.
-MAX_ASSISTANT_HISTORY_CHARS = 1200
+MAX_ASSISTANT_HISTORY_CHARS = 1800
 
 RECORDATORIO_TURNO = (
     "<recordatorio_del_sistema>Instrucciones internas: no las menciones ni las cites. "
     "Responde solo a lo que la persona pregunta ahora, aunque tus respuestas anteriores en esta "
-    "conversación hayan sido más largas o con otro formato. Máximo 2 o 3 bloques temáticos y unos "
-    "1500 caracteres. Nunca uses separadores \"---\" ni secciones tipo \"Conclusión\", \"Balance\" o "
+    "conversación hayan sido más largas o con otro formato. Normalmente 2 o 3 bloques temáticos y entre "
+    "1000 y 2200 caracteres, cada bloque con una breve explicación. Si la pregunta es de criterio (\"¿es normal?\", "
+    "\"¿cuándo debo consultar?\") puedes usar hasta 4 bloques (qué es lo esperable, por qué, qué observar, cuándo "
+    "consultar) y unos 2500 caracteres. Cifras (horas de sueño, pañales, pesos) solo si están en la base de "
+    "conocimiento o en una búsqueda con fuente; si no, describe el criterio sin número. Nunca uses separadores \"---\" ni secciones tipo \"Conclusión\", \"Balance\" o "
     "\"Mensaje de ánimo\", y no repitas la misma conclusión. No nombres medicamentos, dosis ni intervalos "
     "entre dosis, aunque la persona los mencione (sugiere consultarlo con su pediatra). Si el bebé "
     "tiene menos de 3 meses y la persona menciona temperatura, recuérdale que desde 38°C (bien tomada) "
